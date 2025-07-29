@@ -7,9 +7,11 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
+	"github.com/fabienpiette/folio_fox/internal/auth"
 	"github.com/fabienpiette/folio_fox/internal/config"
 	"github.com/fabienpiette/folio_fox/internal/downloads"
 	"github.com/fabienpiette/folio_fox/internal/indexers"
+	"github.com/fabienpiette/folio_fox/internal/models"
 	"github.com/fabienpiette/folio_fox/internal/repositories"
 	"github.com/fabienpiette/folio_fox/internal/search"
 )
@@ -39,6 +41,10 @@ type Container struct {
 	downloadManager *downloads.Manager
 	fileManager     *downloads.FileManager
 	searchService   *search.Service
+	
+	// Auth Services
+	jwtManager      *auth.JWTManager
+	passwordHasher  *auth.PasswordHasher
 	
 	// WebSocket hub for real-time updates
 	wsHub *WebSocketHub
@@ -160,6 +166,16 @@ func (c *Container) GetSearchService() *search.Service {
 	return c.searchService
 }
 
+// GetJWTManager returns the JWT manager
+func (c *Container) GetJWTManager() *auth.JWTManager {
+	return c.jwtManager
+}
+
+// GetPasswordHasher returns the password hasher
+func (c *Container) GetPasswordHasher() *auth.PasswordHasher {
+	return c.passwordHasher
+}
+
 // GetWebSocketHub returns the WebSocket hub
 func (c *Container) GetWebSocketHub() *WebSocketHub {
 	return c.wsHub
@@ -233,13 +249,32 @@ func (c *Container) initializeCoreServices() {
 		
 		// Configure Prowlarr client if enabled
 		if c.config.Prowlarr.Enabled {
-			prowlarrClient := indexers.NewProwlarrClient(&c.config.Prowlarr, c.logger)
+			prowlarrConfig := &models.ProwlarrConfig{
+				Enabled:           c.config.Prowlarr.Enabled,
+				BaseURL:           c.config.Prowlarr.BaseURL,
+				APIKey:            c.config.Prowlarr.APIKey,
+				TimeoutSeconds:    c.config.Prowlarr.TimeoutSeconds,
+				RateLimitRequests: c.config.Prowlarr.RateLimitRequests,
+				RateLimitWindow:   c.config.Prowlarr.RateLimitWindow,
+				SyncIntervalHours: 24, // Default value
+				Status:            "connected",
+			}
+			prowlarrClient := indexers.NewProwlarrClient(prowlarrConfig, c.logger)
 			c.indexerManager.SetProwlarrClient(prowlarrClient)
 		}
 		
 		// Configure Jackett client if enabled
 		if c.config.Jackett.Enabled {
-			jackettClient := indexers.NewJackettClient(&c.config.Jackett, c.logger)
+			jackettConfig := &models.JackettConfig{
+				Enabled:           c.config.Jackett.Enabled,
+				BaseURL:           c.config.Jackett.BaseURL,
+				APIKey:            c.config.Jackett.APIKey,
+				TimeoutSeconds:    c.config.Jackett.TimeoutSeconds,
+				RateLimitRequests: c.config.Jackett.RateLimitRequests,
+				RateLimitWindow:   c.config.Jackett.RateLimitWindow,
+				Status:            "connected",
+			}
+			jackettClient := indexers.NewJackettClient(jackettConfig, c.logger)
 			c.indexerManager.SetJackettClient(jackettClient)
 		}
 	}
@@ -269,6 +304,10 @@ func (c *Container) initializeCoreServices() {
 	if c.indexerManager != nil && c.bookRepo != nil && c.searchRepo != nil {
 		c.searchService = search.NewService(c.indexerManager, c.bookRepo, c.searchRepo, c.logger)
 	}
+	
+	// Initialize auth services
+	c.jwtManager = auth.NewJWTManager(c.config.Auth.JWTSecret, c.config.Auth.TokenDuration)
+	c.passwordHasher = auth.NewPasswordHasher()
 	
 	c.logger.Info("Core services initialized")
 }

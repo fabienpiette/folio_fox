@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Common application errors
@@ -34,7 +35,7 @@ type APIError struct {
 	Status     int                    `json:"status"`
 	Detail     string                 `json:"detail,omitempty"`
 	Instance   string                 `json:"instance,omitempty"`
-	Errors     []ValidationError      `json:"errors,omitempty"`
+	Errors     []ValidationError      `json:"errors"`
 	Timestamp  string                 `json:"timestamp"`
 	RequestID  string                 `json:"request_id,omitempty"`
 }
@@ -77,13 +78,30 @@ func (e *APIError) AddValidationError(field, code, message string) {
 
 // kebabCase converts a string to kebab-case
 func kebabCase(s string) string {
+	// Check if string is all uppercase (excluding spaces)
+	allUpper := true
+	hasLetter := false
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			allUpper = false
+			break
+		}
+		if r >= 'A' && r <= 'Z' {
+			hasLetter = true
+		}
+	}
+	
+	// If it's all uppercase and has letters, return as-is (unless it has spaces)
+	if allUpper && hasLetter && !strings.Contains(s, " ") && !strings.Contains(s, "_") {
+		return s
+	}
+	
 	result := ""
 	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
+		if r == ' ' || r == '_' {
 			result += "-"
-		}
-		if r == ' ' {
-			result += "-"
+		} else if i > 0 && r >= 'A' && r <= 'Z' && result[len(result)-1] != '-' {
+			result += "-" + string(r)
 		} else {
 			result += string(r)
 		}

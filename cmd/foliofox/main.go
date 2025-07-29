@@ -41,7 +41,7 @@ func main() {
 	defer redisClient.Close()
 
 	// Initialize services
-	serviceContainer := services.NewContainer(db, redisClient, cfg)
+	serviceContainer := services.NewContainer(db.DB, redisClient.Client, cfg)
 
 	// Initialize HTTP server
 	httpServer := server.NewHTTPServer(cfg, serviceContainer)

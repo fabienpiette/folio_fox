@@ -546,9 +546,9 @@ func (s *Service) extractYear(title string) int {
 	return 0
 }
 
-func (s *Service) parseYear(s string) int {
+func (s *Service) parseYear(str string) int {
 	year := 0
-	for _, r := range s {
+	for _, r := range str {
 		if r < '0' || r > '9' {
 			return 0
 		}
