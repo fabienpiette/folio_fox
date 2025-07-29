@@ -396,28 +396,40 @@ EOF
     fi
 }
 
-# Pull Docker images
-pull_images() {
-    log "Pulling Docker images..."
+# Build application images and pull dependencies
+build_and_pull_images() {
+    log "Building application images and pulling dependencies..."
     
     cd "$PROJECT_ROOT"
     
+    # First build the application images
+    log "Building backend and frontend images..."
+    docker compose build backend frontend
+    
+    # Then pull external dependencies based on deployment type
     case $DEPLOYMENT_TYPE in
         "core")
-            docker compose pull backend frontend redis
+            docker compose pull redis
             if [[ "$DATABASE_TYPE" == "postgres" ]]; then
-                docker compose --profile postgres pull
+                docker compose --profile postgres pull postgres
             fi
             ;;
         "full")
-            docker compose --profile management pull
+            docker compose pull redis
+            if [[ "$DATABASE_TYPE" == "postgres" ]]; then
+                docker compose --profile postgres pull postgres
+            fi
             ;;
         "complete")
-            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml pull
+            # Pull external monitoring images
+            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml pull redis prometheus grafana node-exporter cadvisor redis-exporter nginx-exporter alertmanager loki promtail jaeger uptime-kuma
+            if [[ "$DATABASE_TYPE" == "postgres" ]]; then
+                docker compose --profile postgres pull postgres
+            fi
             ;;
     esac
     
-    success "Docker images pulled successfully."
+    success "Images built and dependencies pulled successfully."
 }
 
 # Start services
@@ -683,7 +695,7 @@ main() {
     fi
     
     if [[ "$SKIP_PULL" == "false" ]]; then
-        pull_images
+        build_and_pull_images
     fi
     
     if [[ "$SKIP_START" == "false" ]]; then
