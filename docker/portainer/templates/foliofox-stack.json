@@ -1,0 +1,200 @@
+{
+  "version": "2",
+  "templates": [
+    {
+      "type": 3,
+      "title": "FolioFox - Complete Stack",
+      "description": "Complete FolioFox eBook management system with monitoring and management tools",
+      "note": "Deploys the complete FolioFox application stack including backend, frontend, database, cache, and monitoring",
+      "categories": ["Applications", "Media"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/foliofox/foliofox/main/assets/logo.png",
+      "repository": {
+        "url": "https://github.com/foliofox/foliofox",
+        "stackfile": "docker-compose.yml"
+      },
+      "env": [
+        {
+          "name": "BUILD_VERSION",
+          "label": "Application Version",
+          "description": "Version of FolioFox to deploy",
+          "default": "latest"
+        },
+        {
+          "name": "FRONTEND_PORT",
+          "label": "Frontend Port",
+          "description": "Port for accessing the FolioFox web interface",
+          "default": "3000"
+        },
+        {
+          "name": "BACKEND_PORT",
+          "label": "Backend API Port",
+          "description": "Port for the backend API",
+          "default": "8080"
+        },
+        {
+          "name": "DATABASE_TYPE",
+          "label": "Database Type",
+          "description": "Database type to use (sqlite or postgres)",
+          "default": "sqlite",
+          "select": [
+            {
+              "text": "SQLite (Recommended for small deployments)",
+              "value": "sqlite"
+            },
+            {
+              "text": "PostgreSQL (Recommended for production)",
+              "value": "postgres"
+            }
+          ]
+        },
+        {
+          "name": "POSTGRES_PASSWORD",
+          "label": "PostgreSQL Password",
+          "description": "Password for PostgreSQL database (only used if database type is postgres)",
+          "default": "changeme-secure-password"
+        },
+        {
+          "name": "REDIS_PASSWORD",
+          "label": "Redis Password",
+          "description": "Password for Redis cache",
+          "default": "changeme-secure-redis-password"
+        },
+        {
+          "name": "JWT_SECRET",
+          "label": "JWT Secret",
+          "description": "Secret key for JWT token generation",
+          "default": "your-super-secret-jwt-key-change-this-to-something-secure"
+        },
+        {
+          "name": "DATA_DIR",
+          "label": "Data Directory",
+          "description": "Directory on host for persistent data storage",
+          "default": "./data"
+        },
+        {
+          "name": "DOWNLOADS_DIR",
+          "label": "Downloads Directory",
+          "description": "Directory on host for downloaded eBooks",
+          "default": "./downloads"
+        },
+        {
+          "name": "LOGS_DIR",
+          "label": "Logs Directory",
+          "description": "Directory on host for application logs",
+          "default": "./logs"
+        }
+      ]
+    },
+    {
+      "type": 3,
+      "title": "FolioFox - Core Only",
+      "description": "FolioFox core application (backend, frontend, database, cache) without monitoring",
+      "note": "Minimal deployment with just the essential FolioFox components",
+      "categories": ["Applications", "Media"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/foliofox/foliofox/main/assets/logo.png",
+      "repository": {
+        "url": "https://github.com/foliofox/foliofox",
+        "stackfile": "docker-compose.yml"
+      },
+      "env": [
+        {
+          "name": "BUILD_VERSION",
+          "label": "Application Version",
+          "description": "Version of FolioFox to deploy",
+          "default": "latest"
+        },
+        {
+          "name": "FRONTEND_PORT",
+          "label": "Frontend Port",
+          "description": "Port for accessing the FolioFox web interface",
+          "default": "3000"
+        },
+        {
+          "name": "BACKEND_PORT",
+          "label": "Backend API Port",
+          "description": "Port for the backend API",
+          "default": "8080"
+        },
+        {
+          "name": "DATABASE_TYPE",
+          "label": "Database Type",
+          "description": "Database type to use",
+          "default": "sqlite",
+          "select": [
+            {
+              "text": "SQLite",
+              "value": "sqlite"
+            },
+            {
+              "text": "PostgreSQL",
+              "value": "postgres"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": 3,
+      "title": "FolioFox - Development",
+      "description": "FolioFox development environment with hot reload and debugging tools",
+      "note": "Development version with debugging enabled and development tools",
+      "categories": ["Development"],
+      "platform": "linux",
+      "logo": "https://raw.githubusercontent.com/foliofox/foliofox/main/assets/logo.png",
+      "repository": {
+        "url": "https://github.com/foliofox/foliofox",
+        "stackfile": "docker-compose.yml"
+      },
+      "env": [
+        {
+          "name": "ENVIRONMENT",
+          "label": "Environment",
+          "description": "Application environment",
+          "default": "development"
+        },
+        {
+          "name": "DEBUG",
+          "label": "Debug Mode",
+          "description": "Enable debug logging",
+          "default": "true",
+          "select": [
+            {
+              "text": "Enabled",
+              "value": "true"
+            },
+            {
+              "text": "Disabled",
+              "value": "false"
+            }
+          ]
+        },
+        {
+          "name": "LOG_LEVEL",
+          "label": "Log Level",
+          "description": "Application log level",
+          "default": "debug",
+          "select": [
+            {
+              "text": "Debug",
+              "value": "debug"
+            },
+            {
+              "text": "Info",
+              "value": "info"
+            },
+            {
+              "text": "Warning",
+              "value": "warn"
+            },
+            {
+              "text": "Error",
+              "value": "error"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

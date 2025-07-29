@@ -1,0 +1,174 @@
+# Docker Compose Override for Volume Management
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.volumes.yml up
+
+version: '3.8'
+
+services:
+  postgres:
+    volumes:
+      # Use named volume with custom driver options for better performance
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
+        volume:
+          driver: local
+          driver_opts:
+            type: none
+            o: bind
+            device: ${DATA_DIR:-./data}/postgres
+      # Backup volume for database dumps
+      - type: volume
+        source: postgres_backup
+        target: /backup
+        volume:
+          driver: local
+
+  redis:
+    volumes:
+      # Redis data with optimal performance settings
+      - type: volume
+        source: redis_data
+        target: /data
+        volume:
+          driver: local
+          driver_opts:
+            type: none
+            o: bind
+            device: ${DATA_DIR:-./data}/redis
+
+  backend:
+    volumes:
+      # Application data directory
+      - type: volume
+        source: app_data
+        target: /app/data
+        volume:
+          driver: local
+          driver_opts:
+            type: none
+            o: bind
+            device: ${DATA_DIR:-./data}/app
+      
+      # Logs directory with rotation
+      - type: volume
+        source: app_logs
+        target: /app/logs
+        volume:
+          driver: local
+          driver_opts:
+            type: none
+            o: bind
+            device: ${LOGS_DIR:-./logs}/app
+      
+      # Downloads directory with SSD optimization
+      - type: volume
+        source: downloads
+        target: /app/downloads
+        volume:
+          driver: local
+          driver_opts:
+            type: none
+            o: bind
+            device: ${DOWNLOADS_DIR:-./downloads}
+      
+      # Configuration files
+      - type: bind
+        source: ${CONFIG_DIR:-./config}
+        target: /app/config
+        read_only: true
+
+  # Backup service for automated backups
+  backup:
+    image: alpine:3.18
+    container_name: foliofox-backup
+    restart: unless-stopped
+    environment:
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 2 * * *}
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    volumes:
+      - postgres_data:/backup/postgres:ro
+      - redis_data:/backup/redis:ro
+      - app_data:/backup/app:ro
+      - backups:/backup/output
+      - ./scripts/backup:/scripts:ro
+    command: crond -f -d 8
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    networks:
+      - foliofox-network
+    profiles:
+      - backup
+
+  # Volume monitoring and cleanup service
+  volume-monitor:
+    image: alpine:3.18
+    container_name: foliofox-volume-monitor
+    restart: unless-stopped
+    environment:
+      MONITOR_INTERVAL: ${MONITOR_INTERVAL:-300}
+      DISK_USAGE_THRESHOLD: ${DISK_USAGE_THRESHOLD:-80}
+      CLEANUP_ENABLED: ${CLEANUP_ENABLED:-true}
+    volumes:
+      - postgres_data:/monitor/postgres:ro
+      - redis_data:/monitor/redis:ro
+      - app_data:/monitor/app:ro
+      - downloads:/monitor/downloads
+      - app_logs:/monitor/logs
+      - ./scripts/maintenance:/scripts:ro
+    command: /scripts/volume-monitor.sh
+    networks:
+      - foliofox-network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/postgres
+    
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/redis
+  
+  app_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-./data}/app
+  
+  app_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOGS_DIR:-./logs}/app
+  
+  downloads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DOWNLOADS_DIR:-./downloads}
+  
+  backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${BACKUP_DIR:-./backups}
+  
+  postgres_backup:
+    driver: local

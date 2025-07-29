@@ -1,0 +1,2469 @@
+openapi: 3.0.3
+info:
+  title: FolioFox Core API
+  description: |
+    FolioFox is an eBook management and download automation system that provides comprehensive 
+    APIs for managing book collections, automating downloads through various indexers, and 
+    maintaining a high-quality digital library.
+    
+    ## Key Features
+    - **Book Library Management**: Complete CRUD operations for books, authors, series, and metadata
+    - **Download Automation**: Queue management with priority, retry logic, and status tracking
+    - **Indexer Integration**: Support for multiple indexers (Prowlarr, Jackett, direct APIs)
+    - **Search & Discovery**: Full-text search with advanced filtering and caching
+    - **User Management**: Multi-user support with preferences and quality profiles
+    - **Real-time Updates**: WebSocket support for live status updates
+    
+    ## Authentication
+    All API endpoints require authentication via Bearer token unless otherwise specified.
+    
+    ## Rate Limiting
+    - Standard endpoints: 1000 requests per hour per user
+    - Search endpoints: 500 requests per hour per user
+    - Download endpoints: 100 requests per hour per user
+    
+    ## Error Handling
+    All errors follow RFC 7807 Problem Details format with consistent error codes and messages.
+  version: 1.0.0
+  contact:
+    name: FolioFox API Support
+    url: https://github.com/foliofox/foliofox
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+  - url: https://api.foliofox.local/v1
+    description: Local production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ===================================================================
+  # AUTHENTICATION & USER MANAGEMENT
+  # ===================================================================
+  
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: User login
+      description: Authenticate user and receive access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  example: secure_password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: JWT access token
+                  token_type:
+                    type: string
+                    enum: [Bearer]
+                  expires_in:
+                    type: integer
+                    description: Token expiration time in seconds
+                    example: 3600
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/profile:
+    get:
+      tags: [User Management]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    
+    put:
+      tags: [User Management]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/preferences:
+    get:
+      tags: [User Management]
+      summary: Get user preferences
+      responses:
+        '200':
+          description: User preferences retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    
+    put:
+      tags: [User Management]
+      summary: Update user preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferencesUpdate'
+      responses:
+        '200':
+          description: Preferences updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================================================================
+  # BOOK LIBRARY MANAGEMENT
+  # ===================================================================
+
+  /books:
+    get:
+      tags: [Library Management]
+      summary: List books in library
+      description: |
+        Retrieve books from the library with optional filtering, sorting, and pagination.
+        Supports full-text search across titles, authors, descriptions, and tags.
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: search
+          in: query
+          description: Full-text search query
+          schema:
+            type: string
+            example: "science fiction"
+        - name: author
+          in: query
+          description: Filter by author name
+          schema:
+            type: string
+        - name: series
+          in: query
+          description: Filter by series name
+          schema:
+            type: string
+        - name: genre
+          in: query
+          description: Filter by genre
+          schema:
+            type: string
+        - name: language
+          in: query
+          description: Filter by language code
+          schema:
+            type: string
+            example: "en"
+        - name: format
+          in: query
+          description: Filter by available format
+          schema:
+            type: string
+            enum: [epub, pdf, mobi, azw3, txt, djvu, fb2, rtf]
+        - name: rating_min
+          in: query
+          description: Minimum rating filter
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+        - name: rating_max
+          in: query
+          description: Maximum rating filter
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+        - name: publication_year_min
+          in: query
+          description: Minimum publication year
+          schema:
+            type: integer
+        - name: publication_year_max
+          in: query
+          description: Maximum publication year
+          schema:
+            type: integer
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [title, author, publication_date, rating, created_at, updated_at]
+            default: title
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: include_files
+          in: query
+          description: Include file information in response
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Books retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+                  total_count:
+                    type: integer
+                    description: Total number of books matching filters
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Library Management]
+      summary: Add book to library
+      description: Add a new book with metadata to the library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookCreate'
+      responses:
+        '201':
+          description: Book created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Book already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /books/{book_id}:
+    get:
+      tags: [Library Management]
+      summary: Get book details
+      description: Retrieve detailed information about a specific book
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          description: Unique book identifier
+          schema:
+            type: integer
+        - name: include_files
+          in: query
+          description: Include file information
+          schema:
+            type: boolean
+            default: true
+        - name: include_download_history
+          in: query
+          description: Include download history
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Book details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Library Management]
+      summary: Update book metadata
+      description: Update book information and metadata
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookUpdate'
+      responses:
+        '200':
+          description: Book updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Library Management]
+      summary: Remove book from library
+      description: |
+        Remove book from library. This will also delete associated files if specified.
+        **Warning**: This operation cannot be undone.
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: delete_files
+          in: query
+          description: Also delete associated files from disk
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: Book deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot delete - book has active downloads
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /books/{book_id}/files:
+    get:
+      tags: [Library Management]
+      summary: Get book files
+      description: List all files associated with a book
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Book files retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookFile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Library Management]
+      summary: Add file to book
+      description: Associate a new file with an existing book
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, format]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Book file to upload
+                format:
+                  type: string
+                  enum: [epub, pdf, mobi, azw3, txt, djvu, fb2, rtf]
+                quality_score:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  default: 50
+                is_primary:
+                  type: boolean
+                  default: false
+                  description: Set as primary format for this book
+      responses:
+        '201':
+          description: File added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookFile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /books/{book_id}/files/{file_id}:
+    get:
+      tags: [Library Management]
+      summary: Download book file
+      description: Download a specific book file
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: File download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Library Management]
+      summary: Delete book file
+      description: Remove a specific file from a book
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: delete_from_disk
+          in: query
+          description: Also delete file from disk
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '204':
+          description: File deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===================================================================
+  # SEARCH & DISCOVERY
+  # ===================================================================
+
+  /search:
+    get:
+      tags: [Search & Discovery]
+      summary: Search books across indexers
+      description: |
+        Search for books across configured indexers with advanced filtering options.
+        Results are cached for improved performance on repeated queries.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+            example: "Foundation Isaac Asimov"
+        - name: indexers
+          in: query
+          description: Comma-separated list of indexer IDs to search
+          schema:
+            type: string
+            example: "1,2,3"
+        - name: formats
+          in: query
+          description: Comma-separated list of preferred formats
+          schema:
+            type: string
+            example: "epub,pdf"
+        - name: languages
+          in: query
+          description: Comma-separated list of language codes
+          schema:
+            type: string
+            example: "en,es"
+        - name: min_quality
+          in: query
+          description: Minimum quality score
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+        - name: max_size_mb
+          in: query
+          description: Maximum file size in MB
+          schema:
+            type: integer
+            minimum: 1
+        - name: timeout
+          in: query
+          description: Search timeout in seconds
+          schema:
+            type: integer
+            minimum: 5
+            maximum: 60
+            default: 30
+        - name: limit
+          in: query
+          description: Maximum number of results per indexer
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: use_cache
+          in: query
+          description: Use cached results if available
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                    description: Original search query
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchResult'
+                  total_results:
+                    type: integer
+                  indexers_searched:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        indexer_id:
+                          type: integer
+                        indexer_name:
+                          type: string
+                        result_count:
+                          type: integer
+                        response_time_ms:
+                          type: integer
+                        error:
+                          type: string
+                          nullable: true
+                  search_duration_ms:
+                    type: integer
+                  cached:
+                    type: boolean
+                    description: Whether results came from cache
+                  cache_expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /search/suggestions:
+    get:
+      tags: [Search & Discovery]
+      summary: Get search suggestions
+      description: Get autocomplete suggestions based on library content
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Partial search query
+          schema:
+            type: string
+            minLength: 2
+        - name: type
+          in: query
+          description: Type of suggestions
+          schema:
+            type: string
+            enum: [all, title, author, series, genre]
+            default: all
+        - name: limit
+          in: query
+          description: Maximum number of suggestions
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+      responses:
+        '200':
+          description: Suggestions retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        text:
+                          type: string
+                        type:
+                          type: string
+                          enum: [title, author, series, genre]
+                        count:
+                          type: integer
+                          description: Number of matching items in library
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /search/history:
+    get:
+      tags: [Search & Discovery]
+      summary: Get search history
+      description: Retrieve user's search history with statistics
+      parameters:
+        - name: limit
+          in: query
+          description: Number of recent searches to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: days
+          in: query
+          description: Number of days to look back
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+      responses:
+        '200':
+          description: Search history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchHistoryEntry'
+                  total_searches:
+                    type: integer
+                  unique_queries:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Search & Discovery]
+      summary: Clear search history
+      description: Clear user's search history
+      parameters:
+        - name: days
+          in: query
+          description: Clear history older than N days (if not specified, clears all)
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '204':
+          description: Search history cleared
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================================================================
+  # DOWNLOAD MANAGEMENT
+  # ===================================================================
+
+  /downloads/queue:
+    get:
+      tags: [Download Management]
+      summary: Get download queue
+      description: Retrieve current download queue with filtering and pagination
+      parameters:
+        - name: status
+          in: query
+          description: Filter by download status
+          schema:
+            type: string
+            enum: [pending, downloading, completed, failed, cancelled, paused]
+        - name: user_id
+          in: query
+          description: Filter by user ID (admin only)
+          schema:
+            type: integer
+        - name: priority_min
+          in: query
+          description: Minimum priority filter
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+        - name: priority_max
+          in: query
+          description: Maximum priority filter
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+        - name: created_after
+          in: query
+          description: Show downloads created after this date
+          schema:
+            type: string
+            format: date-time
+        - name: created_before
+          in: query
+          description: Show downloads created before this date
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [priority, created_at, started_at, progress, title]
+            default: priority
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        '200':
+          description: Download queue retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  downloads:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DownloadQueueItem'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+                  queue_stats:
+                    type: object
+                    properties:
+                      total_items:
+                        type: integer
+                      pending_count:
+                        type: integer
+                      downloading_count:
+                        type: integer
+                      completed_count:
+                        type: integer
+                      failed_count:
+                        type: integer
+                      total_size_bytes:
+                        type: integer
+                      estimated_completion:
+                        type: string
+                        format: date-time
+                        nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Download Management]
+      summary: Add download to queue
+      description: |
+        Add a new download to the queue. The download will be processed according to 
+        priority and system configuration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadCreate'
+      responses:
+        '201':
+          description: Download added to queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadQueueItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Download already exists in queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /downloads/queue/{download_id}:
+    get:
+      tags: [Download Management]
+      summary: Get download details
+      description: Get detailed information about a specific download
+      parameters:
+        - name: download_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Download details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Download Management]
+      summary: Update download
+      description: Update download properties like priority or destination
+      parameters:
+        - name: download_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadUpdate'
+      responses:
+        '200':
+          description: Download updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadQueueItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot update - download in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Download Management]
+      summary: Cancel/remove download
+      description: |
+        Cancel a download if it's in progress, or remove it from the queue.
+        Completed downloads can only be removed from the queue, not deleted from disk.
+      parameters:
+        - name: download_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: delete_partial
+          in: query
+          description: Delete partial download file
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '204':
+          description: Download cancelled/removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /downloads/queue/{download_id}/pause:
+    post:
+      tags: [Download Management]
+      summary: Pause download
+      description: Pause an active download
+      parameters:
+        - name: download_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Download paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadQueueItem'
+        '400':
+          description: Cannot pause - download not active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /downloads/queue/{download_id}/resume:
+    post:
+      tags: [Download Management]
+      summary: Resume download
+      description: Resume a paused download
+      parameters:
+        - name: download_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Download resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadQueueItem'
+        '400':
+          description: Cannot resume - download not paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /downloads/queue/{download_id}/retry:
+    post:
+      tags: [Download Management]
+      summary: Retry failed download
+      description: Retry a failed download, resetting error state
+      parameters:
+        - name: download_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Download queued for retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadQueueItem'
+        '400':
+          description: Cannot retry - download not failed or max retries exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /downloads/queue/batch:
+    post:
+      tags: [Download Management]
+      summary: Batch queue operations
+      description: |
+        Perform batch operations on multiple queue items (pause, resume, cancel, retry).
+        Useful for managing multiple downloads at once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, download_ids]
+              properties:
+                action:
+                  type: string
+                  enum: [pause, resume, cancel, retry, delete]
+                download_ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+                  maxItems: 100
+                options:
+                  type: object
+                  properties:
+                    delete_partial:
+                      type: boolean
+                      default: true
+                      description: Delete partial files when canceling
+      responses:
+        '200':
+          description: Batch operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success_count:
+                    type: integer
+                  failed_count:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        download_id:
+                          type: integer
+                        success:
+                          type: boolean
+                        error:
+                          type: string
+                          nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /downloads/history:
+    get:
+      tags: [Download Management]
+      summary: Get download history
+      description: Retrieve historical download data with filtering and statistics
+      parameters:
+        - name: status
+          in: query
+          description: Filter by final status
+          schema:
+            type: string
+            enum: [completed, failed, cancelled]
+        - name: user_id
+          in: query
+          description: Filter by user ID (admin only)
+          schema:
+            type: integer
+        - name: indexer_id
+          in: query
+          description: Filter by indexer
+          schema:
+            type: integer
+        - name: date_from
+          in: query
+          description: Start date for history range
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: End date for history range
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [completed_at, title, file_size_bytes, download_duration_seconds]
+            default: completed_at
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Download history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DownloadHistoryItem'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+                  statistics:
+                    type: object
+                    properties:
+                      total_downloads:
+                        type: integer
+                      successful_downloads:
+                        type: integer
+                      failed_downloads:
+                        type: integer
+                      total_bytes_downloaded:
+                        type: integer
+                      average_download_speed_kbps:
+                        type: number
+                      success_rate:
+                        type: number
+                        description: Success rate as percentage (0-100)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /downloads/stats:
+    get:
+      tags: [Download Management]
+      summary: Get download statistics
+      description: Get comprehensive download statistics and metrics
+      parameters:
+        - name: period
+          in: query
+          description: Time period for statistics
+          schema:
+            type: string
+            enum: [day, week, month, year, all]
+            default: month
+        - name: user_id
+          in: query
+          description: Filter by user ID (admin only)
+          schema:
+            type: integer
+        - name: indexer_id
+          in: query
+          description: Filter by indexer
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Download statistics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadStatistics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ===================================================================
+    # USER & AUTHENTICATION SCHEMAS
+    # ===================================================================
+    
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: admin
+        email:
+          type: string
+          format: email
+          example: admin@foliofox.local
+          nullable: true
+        is_active:
+          type: boolean
+          example: true
+        is_admin:
+          type: boolean
+          example: false
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            preferences:
+              $ref: '#/components/schemas/UserPreferences'
+            download_folders:
+              type: array
+              items:
+                $ref: '#/components/schemas/DownloadFolder'
+            quality_profiles:
+              type: array
+              items:
+                $ref: '#/components/schemas/QualityProfile'
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          nullable: true
+        current_password:
+          type: string
+          format: password
+          description: Required when changing email or password
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+
+    UserPreferences:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, auto]
+          default: dark
+        language:
+          type: string
+          example: en
+        timezone:
+          type: string
+          example: UTC
+        notifications_enabled:
+          type: boolean
+          default: true
+        auto_download:
+          type: boolean
+          default: false
+        preferred_quality_profile_id:
+          type: integer
+          nullable: true
+        default_download_folder_id:
+          type: integer
+          nullable: true
+
+    UserPreferencesUpdate:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, auto]
+        language:
+          type: string
+        timezone:
+          type: string
+        notifications_enabled:
+          type: boolean
+        auto_download:
+          type: boolean
+        preferred_quality_profile_id:
+          type: integer
+          nullable: true
+        default_download_folder_id:
+          type: integer
+          nullable: true
+
+    DownloadFolder:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "Main Library"
+        path:
+          type: string
+          example: "/data/books"
+        is_default:
+          type: boolean
+        auto_organize:
+          type: boolean
+        folder_pattern:
+          type: string
+          example: "{author}/{series}/{title}"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    QualityProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "High Quality"
+        preferred_formats:
+          type: array
+          items:
+            type: string
+            enum: [epub, pdf, mobi, azw3, txt, djvu, fb2, rtf]
+          example: ["epub", "pdf"]
+        min_quality_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 70
+        max_file_size_mb:
+          type: integer
+          nullable: true
+          example: 500
+        language_preferences:
+          type: array
+          items:
+            type: string
+          example: ["en", "es"]
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ===================================================================
+    # BOOK & LIBRARY SCHEMAS
+    # ===================================================================
+
+    Book:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "Foundation"
+        subtitle:
+          type: string
+          nullable: true
+          example: "The Foundation Series, Book 1"
+        description:
+          type: string
+          nullable: true
+          example: "The first novel in Isaac Asimov's classic Foundation series..."
+        isbn_10:
+          type: string
+          nullable: true
+          pattern: '^\d{10}$'
+          example: "0553293354"
+        isbn_13:
+          type: string
+          nullable: true
+          pattern: '^\d{13}$'
+          example: "9780553293357"
+        asin:
+          type: string
+          nullable: true
+          example: "B000FC1PWS"
+        goodreads_id:
+          type: string
+          nullable: true
+          example: "29579"
+        google_books_id:
+          type: string
+          nullable: true
+        publication_date:
+          type: string
+          format: date
+          nullable: true
+          example: "1951-05-01"
+        page_count:
+          type: integer
+          nullable: true
+          example: 244
+        language:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            code:
+              type: string
+              example: "en"
+            name:
+              type: string
+              example: "English"
+        publisher:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+              example: "Bantam Spectra"
+        series:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+              example: "Foundation"
+            total_books:
+              type: integer
+              nullable: true
+        series_position:
+          type: number
+          nullable: true
+          example: 1.0
+        authors:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+                example: "Isaac Asimov"
+              role:
+                type: string
+                enum: [author, editor, translator, illustrator]
+                default: author
+        genres:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+                example: "Science Fiction"
+        rating_average:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 5
+          example: 4.13
+        rating_count:
+          type: integer
+          example: 127492
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["classic", "space-opera", "dystopian"]
+        cover_url:
+          type: string
+          nullable: true
+          format: uri
+        cover_local_path:
+          type: string
+          nullable: true
+        available_formats:
+          type: integer
+          description: Number of available file formats
+          example: 3
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BookDetails:
+      allOf:
+        - $ref: '#/components/schemas/Book'
+        - type: object
+          properties:
+            files:
+              type: array
+              items:
+                $ref: '#/components/schemas/BookFile'
+            download_history:
+              type: array
+              items:
+                $ref: '#/components/schemas/DownloadHistoryItem'
+              description: Only included if requested
+
+    BookCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        subtitle:
+          type: string
+          nullable: true
+          maxLength: 500
+        description:
+          type: string
+          nullable: true
+        isbn_10:
+          type: string
+          nullable: true
+          pattern: '^\d{10}$'
+        isbn_13:
+          type: string
+          nullable: true
+          pattern: '^\d{13}$'
+        asin:
+          type: string
+          nullable: true
+        goodreads_id:
+          type: string
+          nullable: true
+        google_books_id:
+          type: string
+          nullable: true
+        publication_date:
+          type: string
+          format: date
+          nullable: true
+        page_count:
+          type: integer
+          nullable: true
+          minimum: 1
+        language_id:
+          type: integer
+          nullable: true
+        publisher_id:
+          type: integer
+          nullable: true
+        series_id:
+          type: integer
+          nullable: true
+        series_position:
+          type: number
+          nullable: true
+          minimum: 0
+        author_ids:
+          type: array
+          items:
+            type: integer
+          description: Array of author IDs
+        genre_ids:
+          type: array
+          items:
+            type: integer  
+          description: Array of genre IDs
+        tags:
+          type: array
+          items:
+            type: string
+        cover_url:
+          type: string
+          nullable: true
+          format: uri
+
+    BookUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        subtitle:
+          type: string
+          nullable: true
+          maxLength: 500
+        description:
+          type: string
+          nullable: true
+        isbn_10:
+          type: string
+          nullable: true
+          pattern: '^\d{10}$'
+        isbn_13:
+          type: string
+          nullable: true
+          pattern: '^\d{13}$'
+        asin:
+          type: string
+          nullable: true
+        goodreads_id:
+          type: string
+          nullable: true
+        google_books_id:
+          type: string
+          nullable: true
+        publication_date:
+          type: string
+          format: date
+          nullable: true
+        page_count:
+          type: integer
+          nullable: true
+          minimum: 1
+        language_id:
+          type: integer
+          nullable: true
+        publisher_id:
+          type: integer
+          nullable: true
+        series_id:
+          type: integer
+          nullable: true
+        series_position:
+          type: number
+          nullable: true
+          minimum: 0
+        author_ids:
+          type: array
+          items:
+            type: integer
+        genre_ids:
+          type: array
+          items:
+            type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        cover_url:
+          type: string
+          nullable: true
+          format: uri
+        rating_average:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 5
+        rating_count:
+          type: integer
+          nullable: true
+          minimum: 0
+
+    BookFile:
+      type: object
+      properties:
+        id:
+          type: integer
+        format:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+              example: "EPUB"
+            mime_type:
+              type: string
+              example: "application/epub+zip"
+        file_path:
+          type: string
+          nullable: true
+          example: "/data/books/Isaac Asimov/Foundation/Foundation.epub"
+        file_size_bytes:
+          type: integer
+          example: 1048576
+        quality_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 85
+        source_url:
+          type: string
+          nullable: true
+          format: uri
+        download_date:
+          type: string
+          format: date-time
+          nullable: true
+        checksum:
+          type: string
+          nullable: true
+          example: "sha256:abc123..."
+        is_primary:
+          type: boolean
+          description: Whether this is the primary format for the book
+        created_at:
+          type: string
+          format: date-time
+
+    # ===================================================================
+    # SEARCH SCHEMAS
+    # ===================================================================
+
+    SearchResult:
+      type: object
+      properties:
+        indexer_id:
+          type: integer
+        indexer_name:
+          type: string
+          example: "Library Genesis"
+        title:
+          type: string
+          example: "Foundation"
+        author:
+          type: string
+          example: "Isaac Asimov"
+        description:
+          type: string
+          nullable: true
+        format:
+          type: string
+          example: "epub"
+        file_size_bytes:
+          type: integer
+          nullable: true
+          example: 1048576
+        file_size_human:
+          type: string
+          example: "1.0 MB"
+        quality_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 85
+        download_url:
+          type: string
+          format: uri
+        source_url:
+          type: string
+          format: uri
+          nullable: true
+        language:
+          type: string
+          nullable: true
+          example: "en"
+        publication_year:
+          type: integer
+          nullable: true
+          example: 1951
+        isbn:
+          type: string
+          nullable: true
+        cover_url:
+          type: string
+          format: uri
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          description: Additional indexer-specific metadata
+          additionalProperties: true
+        found_at:
+          type: string
+          format: date-time
+
+    SearchHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        query:
+          type: string
+          example: "Foundation Isaac Asimov"
+        filters:
+          type: object
+          description: Applied search filters
+          additionalProperties: true
+        results_count:
+          type: integer
+          example: 42
+        indexers_searched:
+          type: array
+          items:
+            type: integer
+          description: Array of indexer IDs that were searched
+        search_duration_ms:
+          type: integer
+          example: 1250
+        searched_at:
+          type: string
+          format: date-time
+
+    # ===================================================================
+    # DOWNLOAD SCHEMAS
+    # ===================================================================
+
+    DownloadQueueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+        book_id:
+          type: integer
+          nullable: true
+          description: Associated book ID if matched to library
+        indexer:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        title:
+          type: string
+          example: "Foundation"
+        author_name:
+          type: string
+          nullable: true
+          example: "Isaac Asimov"
+        download_url:
+          type: string
+          format: uri
+        file_format:
+          type: string
+          example: "epub"
+        file_size_bytes:
+          type: integer
+          nullable: true
+          example: 1048576
+        file_size_human:
+          type: string
+          nullable: true
+          example: "1.0 MB"
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 5
+        status:
+          type: string
+          enum: [pending, downloading, completed, failed, cancelled, paused]
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 45
+        download_path:
+          type: string
+          nullable: true
+          example: "/data/downloads/Foundation.epub"
+        quality_profile:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        retry_count:
+          type: integer
+          example: 0
+        max_retries:
+          type: integer
+          example: 3
+        error_message:
+          type: string
+          nullable: true
+        estimated_completion:
+          type: string
+          format: date-time
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DownloadDetails:
+      allOf:
+        - $ref: '#/components/schemas/DownloadQueueItem'
+        - type: object
+          properties:
+            download_speed_kbps:
+              type: number
+              nullable: true
+              example: 1024.5
+            eta_seconds:
+              type: integer
+              nullable: true
+              example: 120
+            bytes_downloaded:
+              type: integer
+              example: 471859
+            connection_info:
+              type: object
+              nullable: true
+              properties:
+                remote_host:
+                  type: string
+                connection_type:
+                  type: string
+                  enum: [http, https, ftp, torrent]
+                user_agent:
+                  type: string
+            log_entries:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  level:
+                    type: string
+                    enum: [debug, info, warning, error]
+                  message:
+                    type: string
+
+    DownloadCreate:
+      type: object
+      required: [title, download_url, file_format, indexer_id]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          example: "Foundation"
+        author_name:
+          type: string
+          nullable: true
+          example: "Isaac Asimov"
+        download_url:
+          type: string
+          format: uri
+        file_format:
+          type: string
+          enum: [epub, pdf, mobi, azw3, txt, djvu, fb2, rtf]
+        file_size_bytes:
+          type: integer
+          nullable: true
+          minimum: 1
+        indexer_id:
+          type: integer
+        book_id:
+          type: integer
+          nullable: true
+          description: Associate with existing book in library
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+        quality_profile_id:
+          type: integer
+          nullable: true
+          description: Use specific quality profile
+        download_folder_id:
+          type: integer
+          nullable: true
+          description: Use specific download folder
+        metadata:
+          type: object
+          description: Additional metadata from search
+          additionalProperties: true
+
+    DownloadUpdate:
+      type: object
+      properties:
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        download_path:
+          type: string
+          description: Change download destination
+        quality_profile_id:
+          type: integer
+          nullable: true
+        max_retries:
+          type: integer
+          minimum: 0
+          maximum: 10
+
+    DownloadHistoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        queue_id:
+          type: integer
+          description: Original queue item ID
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+        book_id:
+          type: integer
+          nullable: true
+        indexer:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        title:
+          type: string
+        author_name:
+          type: string
+          nullable: true
+        file_format:
+          type: string
+        file_size_bytes:
+          type: integer
+          nullable: true
+        file_size_human:
+          type: string
+          nullable: true
+        download_duration_seconds:
+          type: integer
+          nullable: true
+        download_duration_human:
+          type: string
+          nullable: true
+          example: "2m 15s"
+        final_status:
+          type: string
+          enum: [completed, failed, cancelled]
+        error_message:
+          type: string
+          nullable: true
+        download_path:
+          type: string
+          nullable: true
+        average_speed_kbps:
+          type: number
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+
+    DownloadStatistics:
+      type: object
+      properties:
+        period:
+          type: string
+          description: Statistics period
+        total_downloads:
+          type: integer
+        successful_downloads:
+          type: integer
+        failed_downloads:
+          type: integer
+        cancelled_downloads:
+          type: integer
+        success_rate:
+          type: number
+          description: Success rate as percentage
+          example: 87.5
+        total_bytes_downloaded:
+          type: integer
+        total_bytes_human:
+          type: string
+          example: "1.2 GB"
+        average_download_speed_kbps:
+          type: number
+        average_file_size_mb:
+          type: number
+        most_downloaded_format:
+          type: string
+          example: "epub"
+        top_indexers:
+          type: array
+          items:
+            type: object
+            properties:
+              indexer_name:
+                type: string
+              download_count:
+                type: integer
+              success_rate:
+                type: number
+        downloads_by_day:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+              bytes:
+                type: integer
+        downloads_by_format:
+          type: array
+          items:
+            type: object
+            properties:
+              format:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: number
+
+    # ===================================================================
+    # COMMON SCHEMAS
+    # ===================================================================
+
+    PaginationInfo:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total_pages:
+          type: integer
+          example: 5
+        total_items:
+          type: integer
+          example: 100
+        has_next:
+          type: boolean
+          example: true
+        has_prev:
+          type: boolean
+          example: false
+        next_page:
+          type: integer
+          nullable: true
+          example: 2
+        prev_page:
+          type: integer
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference that identifies the problem type
+          example: "https://api.foliofox.local/problems/validation-error"
+        title:
+          type: string
+          description: A short, human-readable summary of the problem
+          example: "Validation Error"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence
+          example: "The request body contains invalid data"
+        instance:
+          type: string
+          format: uri
+          description: URI reference that identifies the specific occurrence
+          example: "/api/v1/books"
+        errors:
+          type: array
+          description: Detailed validation errors
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: "title"
+              code:
+                type: string
+                example: "required"
+              message:
+                type: string
+                example: "Title is required"
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+          example: "req_123456789"
+
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: "https://api.foliofox.local/problems/bad-request"
+            title: "Bad Request"
+            status: 400
+            detail: "The request contains invalid parameters"
+            instance: "/api/v1/books"
+            timestamp: "2025-07-28T10:30:00Z"
+            request_id: "req_123456789"
+
+    Unauthorized:
+      description: Unauthorized - Invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: "https://api.foliofox.local/problems/unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "Valid authentication is required"
+            instance: "/api/v1/books"
+            timestamp: "2025-07-28T10:30:00Z"
+            request_id: "req_123456789"
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: "https://api.foliofox.local/problems/forbidden"
+            title: "Forbidden"
+            status: 403
+            detail: "You don't have permission to access this resource"
+            instance: "/api/v1/books/1"
+            timestamp: "2025-07-28T10:30:00Z"
+            request_id: "req_123456789"
+
+    NotFound:
+      description: Not Found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: "https://api.foliofox.local/problems/not-found"
+            title: "Not Found"
+            status: 404
+            detail: "The requested resource was not found"
+            instance: "/api/v1/books/999"
+            timestamp: "2025-07-28T10:30:00Z"
+            request_id: "req_123456789"
+
+    RateLimited:
+      description: Too Many Requests - Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per time window
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Time when rate limit resets (Unix timestamp)
+          schema:
+            type: integer
+        Retry-After:
+          description: Seconds until rate limit resets
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: "https://api.foliofox.local/problems/rate-limited"
+            title: "Rate Limited"
+            status: 429
+            detail: "Too many requests. Please try again later"
+            instance: "/api/v1/search"
+            timestamp: "2025-07-28T10:30:00Z"
+            request_id: "req_123456789"
+
+tags:
+  - name: Authentication
+    description: User authentication and token management
+  - name: User Management
+    description: User profile and preferences management
+  - name: Library Management
+    description: Book library CRUD operations and file management
+  - name: Search & Discovery
+    description: Search functionality across indexers and library
+  - name: Download Management
+    description: Download queue and history management

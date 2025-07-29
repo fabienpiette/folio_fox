@@ -1,0 +1,455 @@
+# FolioFox Deployment Automation Configuration Templates
+# Copy and customize these templates for your environment
+
+# Deployment Manager Configuration Template
+deployment_config: |
+  deployment:
+    database: /var/lib/folio_fox/deployment.db
+    artifact_store: /var/lib/folio_fox/artifacts
+    backup_path: /var/backups/folio_fox/deployments
+    max_concurrent_services: 3
+    health_check_timeout: 30
+    rollback_retention_days: 30
+
+  environments:
+    development:
+      base_path: /opt/folio_fox/dev
+      database_path: /var/lib/folio_fox/dev.db
+      log_path: /var/log/folio_fox/dev
+    staging:
+      base_path: /opt/folio_fox/staging
+      database_path: /var/lib/folio_fox/staging.db
+      log_path: /var/log/folio_fox/staging
+    production:
+      base_path: /opt/folio_fox/prod
+      database_path: /var/lib/folio_fox/prod.db
+      log_path: /var/log/folio_fox/prod
+
+  services:
+    - name: folio-fox-backend
+      port: 8080
+      health_check_path: /health
+      startup_timeout: 60
+      dependencies: []
+      restart_policy: unless-stopped
+      environment_vars:
+        GO_ENV: "{{environment}}"
+        DATABASE_PATH: "{{environment.database_path}}"
+        LOG_LEVEL: "{{environment == 'production' and 'info' or 'debug'}}"
+    
+    - name: folio-fox-frontend  
+      port: 3000
+      health_check_path: /
+      startup_timeout: 30
+      dependencies: [folio-fox-backend]
+      restart_policy: unless-stopped
+      environment_vars:
+        NODE_ENV: "{{environment == 'development' and 'development' or 'production'}}"
+        API_BASE_URL: "http://localhost:8080"
+
+# CI/CD Pipeline Configuration Template  
+cicd_config: |
+  pipeline:
+    database: /var/lib/folio_fox/pipeline.db
+    workspace: /var/lib/folio_fox/workspace
+    artifact_store: /var/lib/folio_fox/artifacts
+    max_concurrent_pipelines: 3
+    retention_days: 30
+
+  git:
+    repository_url: https://github.com/your-org/folio_fox.git  # UPDATE THIS
+    default_branch: main
+    clone_depth: 1
+    # Optional: SSH key path for private repositories
+    # ssh_key_path: /var/lib/folio_fox/.ssh/id_rsa
+
+  build:
+    go_version: "1.21"
+    node_version: "18"
+    timeout_minutes: 30
+    # Build environment variables
+    environment_vars:
+      CGO_ENABLED: "0"
+      GOOS: "linux"
+      GOARCH: "amd64"
+
+  test:
+    timeout_minutes: 15
+    coverage_threshold: 80.0
+    # Test databases
+    test_database_url: "sqlite:///tmp/folio_fox_test.db"
+    # Integration test settings
+    integration_timeout_minutes: 20
+
+  security:
+    enable_sast: true
+    enable_dependency_scan: true
+    enable_container_scan: true
+    fail_on_high: true
+    # Security scanner settings
+    sast_config_path: /etc/folio_fox/sast.yml
+    dependency_scan_config: /etc/folio_fox/dependency-scan.yml
+
+  deployment:
+    config_path: /etc/folio_fox/deployment.yaml
+
+  notifications:
+    # Slack webhook for build notifications
+    slack_webhook_url: null  # UPDATE THIS
+    # Email recipients for critical failures
+    email_recipients: []  # UPDATE THIS
+    # Teams webhook (alternative to Slack)
+    teams_webhook_url: null
+
+# Orchestrator Configuration Template
+orchestrator_config: |
+  orchestrator:
+    database: /var/lib/folio_fox/orchestrator.db
+    approval_required_environments: [production]
+    auto_promotion_enabled: false
+    health_check_interval_minutes: 5
+    # Promotion workflow settings
+    require_approval_for_production: true
+    allow_skip_staging: false  # Set to true for hotfix workflows
+
+  deployment:
+    config_path: /etc/folio_fox/deployment.yaml
+
+  cicd:
+    config_path: /etc/folio_fox/cicd.yaml
+
+  validation:
+    # Soak time before considering deployment stable
+    development_soak_time_minutes: 5
+    staging_soak_time_minutes: 30  
+    production_soak_time_minutes: 60
+    
+    # Health check endpoints to validate
+    health_check_endpoints:
+      - /health
+      - /metrics
+      - /api/v1/status
+    
+    # Smoke test configuration
+    smoke_test_timeout_minutes: 10
+    smoke_test_retry_count: 3
+
+  rollback:
+    auto_rollback_enabled: true
+    failure_threshold_percent: 5.0
+    monitoring_duration_minutes: 15
+    # Rollback approval requirements
+    production_rollback_requires_approval: true
+    emergency_rollback_contacts: []  # UPDATE THIS
+
+  notifications:
+    # Slack channels for different alert types
+    slack_webhook_url: null  # UPDATE THIS
+    slack_channels:
+      deployments: "#deployments"
+      alerts: "#alerts"  
+      critical: "#critical-alerts"
+    
+    # Email settings
+    email_recipients: []  # UPDATE THIS
+    smtp_server: null
+    smtp_port: 587
+    smtp_username: null
+    smtp_password: null
+    
+    # PagerDuty integration
+    pagerduty_integration_key: null
+    
+    # Critical alert escalation
+    critical_alert_channels: []  # UPDATE THIS
+
+# System Maintenance Configuration Template
+maintenance_config: |
+  database:
+    path: /var/lib/folio_fox/folio_fox.db
+    backup_path: /var/backups/folio_fox/
+    max_backup_age_days: 30
+
+  maintenance:
+    database: /var/lib/folio_fox/maintenance.db
+    log_retention_days: 90
+    max_log_size_mb: 100
+
+  monitoring:
+    cpu_threshold: 80.0
+    memory_threshold: 85.0
+    disk_threshold: 90.0
+    fragmentation_threshold: 20.0
+    # Database connection pool monitoring
+    connection_pool_threshold: 80.0
+    # Log analysis settings
+    error_spike_threshold: 10  # errors per minute
+    warning_spike_threshold: 50  # warnings per minute
+
+  schedules:
+    quick_check_interval_hours: 6
+    routine_maintenance_interval_hours: 24
+    full_maintenance_interval_days: 7
+    # Backup schedule
+    backup_interval_hours: 12
+    backup_retention_days: 30
+
+  cleanup:
+    # Log file cleanup
+    max_log_files: 100
+    log_compression_age_days: 7
+    log_deletion_age_days: 90
+    
+    # Temporary file cleanup
+    temp_file_age_hours: 24
+    workspace_cleanup_age_days: 3
+    
+    # Database maintenance
+    vacuum_interval_days: 7
+    analyze_interval_days: 1
+    reindex_interval_days: 30
+
+# Complete Example Configuration Files
+
+# /etc/folio_fox/deployment.yaml
+deployment_example: |
+  deployment:
+    database: /var/lib/folio_fox/deployment.db
+    artifact_store: /var/lib/folio_fox/artifacts
+    backup_path: /var/backups/folio_fox/deployments
+    max_concurrent_services: 2
+    health_check_timeout: 30
+    rollback_retention_days: 14
+
+  environments:
+    development:
+      base_path: /opt/folio_fox/dev
+      database_path: /var/lib/folio_fox/dev.db
+      log_path: /var/log/folio_fox/dev
+    staging:
+      base_path: /opt/folio_fox/staging  
+      database_path: /var/lib/folio_fox/staging.db
+      log_path: /var/log/folio_fox/staging
+    production:
+      base_path: /opt/folio_fox/prod
+      database_path: /var/lib/folio_fox/prod.db
+      log_path: /var/log/folio_fox/prod
+
+  services:
+    - name: folio-fox-backend
+      port: 8080
+      health_check_path: /health
+      startup_timeout: 60
+      dependencies: []
+
+# /etc/folio_fox/cicd.yaml  
+cicd_example: |
+  pipeline:
+    database: /var/lib/folio_fox/pipeline.db
+    workspace: /var/lib/folio_fox/workspace
+    artifact_store: /var/lib/folio_fox/artifacts
+    max_concurrent_pipelines: 2
+    retention_days: 30
+
+  git:
+    repository_url: https://github.com/example/folio_fox.git
+    default_branch: main
+    clone_depth: 1
+
+  build:
+    go_version: "1.21"
+    node_version: "18" 
+    timeout_minutes: 30
+
+  test:
+    timeout_minutes: 15
+    coverage_threshold: 75.0
+
+  security:
+    enable_sast: true
+    enable_dependency_scan: true
+    fail_on_high: true
+
+  deployment:
+    config_path: /etc/folio_fox/deployment.yaml
+
+# /etc/folio_fox/orchestrator.yaml
+orchestrator_example: |
+  orchestrator:
+    database: /var/lib/folio_fox/orchestrator.db
+    approval_required_environments: [production]
+    auto_promotion_enabled: false
+    health_check_interval_minutes: 5
+
+  deployment:
+    config_path: /etc/folio_fox/deployment.yaml
+
+  cicd:
+    config_path: /etc/folio_fox/cicd.yaml
+
+  validation:
+    staging_soak_time_minutes: 15
+    production_soak_time_minutes: 30
+    health_check_endpoints: [/health, /metrics]
+
+  rollback:
+    auto_rollback_enabled: true
+    failure_threshold_percent: 5.0
+    monitoring_duration_minutes: 10
+
+# /etc/folio_fox/maintenance.yaml
+maintenance_example: |
+  database:
+    path: /var/lib/folio_fox/folio_fox.db
+    backup_path: /var/backups/folio_fox/
+    max_backup_age_days: 30
+
+  maintenance:
+    database: /var/lib/folio_fox/maintenance.db
+    log_retention_days: 90
+    max_log_size_mb: 100
+
+  monitoring:
+    cpu_threshold: 80.0
+    memory_threshold: 85.0
+    disk_threshold: 90.0
+    fragmentation_threshold: 20.0
+
+  schedules:
+    quick_check_interval_hours: 6
+    routine_maintenance_interval_hours: 24
+    full_maintenance_interval_days: 7
+
+# Usage Instructions
+usage_instructions: |
+  # FolioFox Deployment Automation Setup Instructions
+
+  ## 1. Initial Setup
+
+  ### Create configuration directories:
+  sudo mkdir -p /etc/folio_fox
+  sudo mkdir -p /var/lib/folio_fox
+  sudo mkdir -p /var/log/folio_fox
+  sudo mkdir -p /var/backups/folio_fox
+
+  ### Set permissions:
+  sudo chown -R folio_fox:folio_fox /var/lib/folio_fox
+  sudo chown -R folio_fox:folio_fox /var/log/folio_fox
+  sudo chown -R folio_fox:folio_fox /var/backups/folio_fox
+
+  ## 2. Configuration Files
+
+  ### Copy and customize configuration templates:
+  sudo cp deployment_example.yaml /etc/folio_fox/deployment.yaml
+  sudo cp cicd_example.yaml /etc/folio_fox/cicd.yaml
+  sudo cp orchestrator_example.yaml /etc/folio_fox/orchestrator.yaml
+  sudo cp maintenance_example.yaml /etc/folio_fox/maintenance.yaml
+
+  ### Edit configurations with your specific settings:
+  sudo nano /etc/folio_fox/deployment.yaml
+  # Update repository URLs, paths, and service configurations
+
+  ## 3. Database Initialization
+
+  ### Initialize all databases:
+  python3 deployment_manager.py --config /etc/folio_fox/deployment.yaml status --environment development
+  python3 cicd_pipeline.py --config /etc/folio_fox/cicd.yaml status --recent 1
+  python3 orchestrator.py --config /etc/folio_fox/orchestrator.yaml overview
+
+  ## 4. Service Integration
+
+  ### Create systemd service files (optional):
+  # deployment-monitor.service
+  # orchestrator-daemon.service
+  # maintenance-scheduler.service
+
+  ## 5. Monitoring Setup
+
+  ### Configure log rotation:
+  sudo cp logrotate.conf /etc/logrotate.d/folio_fox
+
+  ### Set up monitoring cron jobs:
+  # Add to crontab for automated maintenance
+  0 2 * * * /usr/bin/python3 /path/to/maintenance_orchestrator.py --config /etc/folio_fox/maintenance.yaml --routine-maintenance
+  0 6 * * 0 /usr/bin/python3 /path/to/maintenance_orchestrator.py --config /etc/folio_fox/maintenance.yaml --full-maintenance
+
+  ## 6. Testing and Validation
+
+  ### Test deployment workflow:
+  # 1. Create test artifact
+  python3 deployment_manager.py create-artifact --source /path/to/build --version 1.0.0-test
+
+  # 2. Deploy to development
+  python3 deployment_manager.py deploy --environment development --version 1.0.0-test
+
+  # 3. Test promotion workflow
+  python3 orchestrator.py promote --from development --to staging --version 1.0.0-test
+
+  ### Test CI/CD pipeline:
+  python3 cicd_pipeline.py run --trigger manual --branch main
+
+  ## 7. Production Considerations
+
+  ### Security:
+  - Store sensitive configuration in encrypted files or secret management systems
+  - Use proper file permissions (600) for configuration files
+  - Enable SSH key authentication for Git operations
+  - Configure firewall rules for service ports
+
+  ### Monitoring:
+  - Set up external monitoring for deployment health
+  - Configure alerting for failed deployments
+  - Monitor disk space in artifact and backup directories
+  - Set up log aggregation and analysis
+
+  ### Backup Strategy:
+  - Regular database backups
+  - Artifact retention policies  
+  - Configuration file backups
+  - Recovery procedures documentation
+
+  ### High Availability:
+  - Consider database replication for critical data
+  - Load balancing for deployment managers
+  - Backup deployment infrastructure
+  - Disaster recovery procedures
+
+# Troubleshooting Guide
+troubleshooting: |
+  # Common Issues and Solutions
+
+  ## Database Connection Issues
+  - Check database file permissions
+  - Verify database directory exists
+  - Check disk space availability
+  - Review database lock issues
+
+  ## Deployment Failures
+  - Check artifact integrity and checksums
+  - Verify target environment accessibility
+  - Review service dependency startup order
+  - Check resource availability (CPU, memory, disk)
+
+  ## CI/CD Pipeline Issues
+  - Verify Git repository access and credentials
+  - Check build environment setup (Go, Node.js versions)
+  - Review test database connectivity
+  - Validate artifact store permissions
+
+  ## Health Check Failures
+  - Verify service endpoint accessibility
+  - Check service startup times and timeouts
+  - Review service logs for startup errors
+  - Validate health check endpoint responses
+
+  ## Performance Issues
+  - Monitor database query performance
+  - Check artifact store disk I/O
+  - Review concurrent deployment limits
+  - Optimize build and test execution times
+
+  ## Monitoring and Alerting
+  - Verify webhook URL accessibility
+  - Check email/Slack notification configurations
+  - Review log file rotation settings
+  - Monitor system resource usage

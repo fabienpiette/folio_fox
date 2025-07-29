@@ -1,0 +1,2323 @@
+openapi: 3.0.3
+info:
+  title: FolioFox System Management API
+  description: |
+    System monitoring, health checks, and administrative operations for FolioFox.
+    
+    This API provides comprehensive system monitoring capabilities including:
+    - **Health Monitoring**: Real-time system health and component status
+    - **Performance Metrics**: System performance, resource usage, and statistics
+    - **Configuration Management**: System settings and runtime configuration
+    - **Maintenance Operations**: Database maintenance, backups, and cleanup tasks
+    - **Indexer Management**: Indexer configuration, health monitoring, and testing
+    - **User Administration**: User management and system administration (admin only)
+    
+    ## Authentication & Authorization
+    - Most endpoints require admin privileges
+    - Health check endpoints may be accessible without authentication for monitoring tools
+    - Bearer token authentication required for all administrative operations
+    
+    ## Rate Limiting
+    - Health endpoints: No rate limiting (for monitoring tools)
+    - Administrative endpoints: 100 requests per hour per admin user
+    - Maintenance operations: 10 requests per hour per admin user
+  version: 1.0.0
+  contact:
+    name: FolioFox System API Support
+    url: https://github.com/foliofox/foliofox
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1/system
+    description: Development server
+  - url: https://api.foliofox.local/v1/system
+    description: Local production server
+
+security:
+  - bearerAuth: []
+  - {} # Some endpoints allow unauthenticated access
+
+paths:
+  # ===================================================================
+  # HEALTH MONITORING
+  # ===================================================================
+
+  /health:
+    get:
+      tags: [Health Monitoring]
+      summary: System health check
+      description: |
+        Basic health check endpoint for monitoring tools. Returns overall system status
+        and critical component health. This endpoint can be accessed without authentication
+        for external monitoring systems.
+      security: []
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /health/detailed:
+    get:
+      tags: [Health Monitoring]
+      summary: Detailed system health
+      description: |
+        Comprehensive health information including all components, dependencies,
+        and detailed status information. Requires authentication.
+      responses:
+        '200':
+          description: Detailed health information retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealthStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health/components:
+    get:
+      tags: [Health Monitoring]
+      summary: Component health status
+      description: Get health status for individual system components
+      parameters:
+        - name: component
+          in: query
+          description: Filter by specific component
+          schema:
+            type: string
+            enum: [database, redis, indexers, filesystem, downloads, scheduler]
+      responses:
+        '200':
+          description: Component health retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  components:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ComponentHealth'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health/indexers:
+    get:
+      tags: [Health Monitoring]
+      summary: Indexer health status
+      description: Get health status for all configured indexers
+      responses:
+        '200':
+          description: Indexer health retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  indexers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IndexerHealth'
+                  summary:
+                    type: object
+                    properties:
+                      total_indexers:
+                        type: integer
+                      healthy_count:
+                        type: integer
+                      degraded_count:
+                        type: integer
+                      down_count:
+                        type: integer
+                      average_response_time_ms:
+                        type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health/indexers/{indexer_id}/test:
+    post:
+      tags: [Health Monitoring]
+      summary: Test indexer connectivity
+      description: Perform live connectivity test for a specific indexer
+      parameters:
+        - name: indexer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timeout_seconds:
+                  type: integer
+                  minimum: 5
+                  maximum: 60
+                  default: 30
+                test_search:
+                  type: boolean
+                  default: true
+                  description: Also test search functionality
+                search_query:
+                  type: string
+                  default: "test"
+                  description: Query to use for search test
+      responses:
+        '200':
+          description: Indexer test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexerTestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===================================================================
+  # PERFORMANCE METRICS
+  # ===================================================================
+
+  /metrics:
+    get:
+      tags: [Performance Metrics]
+      summary: System performance metrics
+      description: |
+        Get comprehensive system performance metrics including resource usage,
+        operation counts, response times, and other key performance indicators.
+      parameters:
+        - name: period
+          in: query
+          description: Time period for metrics
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 7d, 30d]
+            default: 1h
+        - name: format
+          in: query
+          description: Response format
+          schema:
+            type: string
+            enum: [json, prometheus]
+            default: json
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemMetrics'
+            text/plain:
+              schema:
+                type: string
+                description: Prometheus format metrics
+              example: |
+                # HELP foliofox_downloads_total Total number of downloads
+                # TYPE foliofox_downloads_total counter
+                foliofox_downloads_total 1234
+                
+                # HELP foliofox_books_total Total number of books in library
+                # TYPE foliofox_books_total gauge
+                foliofox_books_total 5678
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /metrics/downloads:
+    get:
+      tags: [Performance Metrics]
+      summary: Download system metrics
+      description: Detailed metrics for the download system
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 7d, 30d]
+            default: 24h
+      responses:
+        '200':
+          description: Download metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /metrics/search:
+    get:
+      tags: [Performance Metrics]
+      summary: Search system metrics
+      description: Detailed metrics for the search and indexer system
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 7d, 30d]
+            default: 24h
+      responses:
+        '200':
+          description: Search metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /metrics/system:
+    get:
+      tags: [Performance Metrics]
+      summary: System resource metrics
+      description: System resource usage metrics (CPU, memory, disk, etc.)
+      responses:
+        '200':
+          description: System resource metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemResourceMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================================================================
+  # CONFIGURATION MANAGEMENT
+  # ===================================================================
+
+  /config:
+    get:
+      tags: [Configuration Management]
+      summary: Get system configuration
+      description: |
+        Retrieve current system configuration. Sensitive values like passwords
+        and API keys are masked in the response.
+      parameters:
+        - name: category
+          in: query
+          description: Filter by configuration category
+          schema:
+            type: string
+            enum: [general, downloads, search, monitoring, privacy, ui, system]
+        - name: include_sensitive
+          in: query
+          description: Include sensitive configuration values (superuser only)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Configuration retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConfigurationSetting'
+                  categories:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    put:
+      tags: [Configuration Management]
+      summary: Update system configuration
+      description: |
+        Update system configuration settings. Changes may require service restart
+        to take effect. Only admin users can modify configuration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  type: array
+                  items:
+                    type: object
+                    required: [key, value]
+                    properties:
+                      key:
+                        type: string
+                        example: "max_concurrent_downloads"
+                      value:
+                        type: string 
+                        example: "5"
+                restart_required:
+                  type: boolean
+                  default: false
+                  description: Restart services if required
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated_settings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConfigurationSetting'
+                  restart_required:
+                    type: boolean
+                  validation_errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        error:
+                          type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /config/defaults:
+    get:
+      tags: [Configuration Management]
+      summary: Get default configuration
+      description: Retrieve default configuration values for all settings
+      responses:
+        '200':
+          description: Default configuration retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  defaults:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConfigurationSetting'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Configuration Management]
+      summary: Reset to default configuration
+      description: |
+        Reset specified configuration settings to their default values.
+        **Warning**: This operation cannot be undone.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keys:
+                  type: array
+                  items:
+                    type: string
+                  description: Configuration keys to reset (empty = reset all)
+                confirm:
+                  type: boolean
+                  description: Confirmation flag required for safety
+      responses:
+        '200':
+          description: Configuration reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reset_settings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConfigurationSetting'
+                  restart_required:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ===================================================================
+  # INDEXER MANAGEMENT
+  # ===================================================================
+
+  /indexers:
+    get:
+      tags: [Indexer Management]
+      summary: List configured indexers
+      description: Get list of all configured indexers with their current status
+      parameters:
+        - name: type
+          in: query
+          description: Filter by indexer type
+          schema:
+            type: string
+            enum: [public, private, semi-private]
+        - name: active_only
+          in: query
+          description: Show only active indexers
+          schema:
+            type: boolean
+            default: false
+        - name: include_health
+          in: query
+          description: Include latest health check data
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Indexers retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  indexers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IndexerConfiguration'
+                  summary:
+                    type: object
+                    properties:
+                      total_count:
+                        type: integer
+                      active_count:
+                        type: integer
+                      healthy_count:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Indexer Management]
+      summary: Add new indexer
+      description: Configure a new indexer for the system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IndexerCreate'
+      responses:
+        '201':
+          description: Indexer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexerConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Indexer with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /indexers/{indexer_id}:
+    get:
+      tags: [Indexer Management]
+      summary: Get indexer details
+      description: Get detailed information about a specific indexer
+      parameters:
+        - name: indexer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: include_health_history
+          in: query
+          description: Include health check history
+          schema:
+            type: boolean
+            default: false
+        - name: health_history_days
+          in: query
+          description: Number of days of health history to include
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 30
+            default: 7
+      responses:
+        '200':
+          description: Indexer details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexerDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Indexer Management]
+      summary: Update indexer configuration
+      description: Update indexer settings and configuration
+      parameters:
+        - name: indexer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IndexerUpdate'
+      responses:
+        '200':
+          description: Indexer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexerConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Indexer Management]
+      summary: Remove indexer
+      description: |
+        Remove an indexer from the system. This will also disable it for all users
+        and clean up associated data.
+      parameters:
+        - name: indexer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: cleanup_data
+          in: query
+          description: Remove associated search cache and history data
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '204':
+          description: Indexer removed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot remove - indexer has active downloads
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /indexers/{indexer_id}/enable:
+    post:
+      tags: [Indexer Management]
+      summary: Enable indexer
+      description: Enable an indexer system-wide
+      parameters:
+        - name: indexer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Indexer enabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexerConfiguration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /indexers/{indexer_id}/disable:
+    post:
+      tags: [Indexer Management]
+      summary: Disable indexer
+      description: Disable an indexer system-wide
+      parameters:
+        - name: indexer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Indexer disabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexerConfiguration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===================================================================
+  # MAINTENANCE OPERATIONS
+  # ===================================================================
+
+  /maintenance/status:
+    get:
+      tags: [Maintenance Operations]
+      summary: Get maintenance status
+      description: Get status of scheduled and running maintenance tasks
+      responses:
+        '200':
+          description: Maintenance status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scheduled_tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScheduledTask'
+                  active_tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MaintenanceTask'
+                  last_maintenance:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  next_maintenance:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /maintenance/database:
+    post:
+      tags: [Maintenance Operations]
+      summary: Perform database maintenance
+      description: |
+        Perform database maintenance operations including VACUUM, ANALYZE,
+        and integrity checks. This operation may take significant time for large databases.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                operations:
+                  type: array
+                  items:
+                    type: string
+                    enum: [vacuum, analyze, integrity_check, rebuild_fts]
+                  default: [vacuum, analyze]
+                force:
+                  type: boolean
+                  default: false
+                  description: Force maintenance even if recent maintenance was performed
+      responses:
+        '202':
+          description: Maintenance task started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceTaskStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Maintenance already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /maintenance/cleanup:
+    post:
+      tags: [Maintenance Operations]
+      summary: Perform system cleanup
+      description: |
+        Clean up old logs, expired cache entries, temporary files, and other 
+        system data that can be safely removed.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cleanup_types:
+                  type: array
+                  items:
+                    type: string
+                    enum: [logs, cache, temp_files, orphaned_files, old_downloads]
+                  default: [logs, cache, temp_files]
+                dry_run:
+                  type: boolean
+                  default: false
+                  description: Preview what would be cleaned up
+                age_days:
+                  type: integer
+                  minimum: 1
+                  default: 30
+                  description: Only clean up items older than this many days
+      responses:
+        '200':
+          description: Cleanup completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cleanup_results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        items_cleaned:
+                          type: integer
+                        bytes_freed:
+                          type: integer
+                        duration_seconds:
+                          type: number
+                  total_bytes_freed:
+                    type: integer
+                  total_duration_seconds:
+                    type: number
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /maintenance/backup:
+    post:
+      tags: [Maintenance Operations]
+      summary: Create system backup
+      description: |
+        Create a full system backup including database, configuration,
+        and optionally user files.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_type:
+                  type: string
+                  enum: [full, database_only, config_only]
+                  default: full
+                include_files:
+                  type: boolean
+                  default: false
+                  description: Include user book files in backup
+                compression:
+                  type: string
+                  enum: [none, gzip, bzip2]
+                  default: gzip
+                destination:
+                  type: string
+                  description: Backup destination path (optional)
+      responses:
+        '202':
+          description: Backup started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                  backup_path:
+                    type: string
+                  estimated_duration_minutes:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '507':
+          description: Insufficient storage space
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /maintenance/backup/history:
+    get:
+      tags: [Maintenance Operations]
+      summary: Get backup history
+      description: List of all system backups with their status and details
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: backup_type
+          in: query
+          schema:
+            type: string
+            enum: [full, database_only, config_only]
+      responses:
+        '200':
+          description: Backup history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BackupRecord'
+                  storage_usage:
+                    type: object
+                    properties:
+                      total_backups:
+                        type: integer
+                      total_size_bytes:
+                        type: integer
+                      oldest_backup:
+                        type: string
+                        format: date-time
+                      newest_backup:
+                        type: string
+                        format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /maintenance/tasks/{task_id}:
+    get:
+      tags: [Maintenance Operations]
+      summary: Get maintenance task status
+      description: Get status and progress of a specific maintenance task
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceTaskStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===================================================================
+  # USER ADMINISTRATION
+  # ===================================================================
+
+  /admin/users:
+    get:
+      tags: [User Administration]
+      summary: List all users
+      description: Get list of all users in the system (admin only)
+      parameters:
+        - name: active_only
+          in: query
+          description: Show only active users
+          schema:
+            type: boolean
+            default: false
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [username, email, created_at, last_login]
+            default: username
+        - name: search
+          in: query
+          description: Search users by username or email
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUserView'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+                  summary:
+                    type: object
+                    properties:
+                      total_users:
+                        type: integer
+                      active_users:
+                        type: integer
+                      admin_users:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [User Administration]
+      summary: Create new user
+      description: Create a new user account (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserView'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{user_id}:
+    get:
+      tags: [User Administration]
+      summary: Get user details
+      description: Get detailed information about a specific user (admin only)
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: include_activity
+          in: query
+          description: Include recent activity data
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: User details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [User Administration]
+      summary: Update user account
+      description: Update user account details (admin only)
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdate'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserView'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [User Administration]
+      summary: Delete user account
+      description: |
+        Delete a user account and optionally their associated data.
+        **Warning**: This operation cannot be undone.
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: delete_data
+          in: query
+          description: Also delete user's books and download history
+          schema:
+            type: boolean
+            default: false
+        - name: delete_files
+          in: query
+          description: Also delete user's downloaded files
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: User deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot delete - user has active downloads
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{user_id}/activate:
+    post:
+      tags: [User Administration]
+      summary: Activate user account
+      description: Activate a deactivated user account
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User activated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/users/{user_id}/deactivate:
+    post:
+      tags: [User Administration]
+      summary: Deactivate user account
+      description: Deactivate a user account (prevents login but preserves data)
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User deactivated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/stats:
+    get:
+      tags: [User Administration]
+      summary: Get admin statistics
+      description: Get comprehensive system statistics and insights (admin only)
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [1d, 7d, 30d, 90d, 1y, all]
+            default: 30d
+      responses:
+        '200':
+          description: Admin statistics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStatistics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ===================================================================
+    # HEALTH MONITORING SCHEMAS
+    # ===================================================================
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "1.0.0"
+        uptime_seconds:
+          type: integer
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [healthy, unhealthy]
+            redis:
+              type: string
+              enum: [healthy, unhealthy]
+            indexers:
+              type: string
+              enum: [healthy, degraded, unhealthy]
+            filesystem:
+              type: string
+              enum: [healthy, unhealthy]
+
+    DetailedHealthStatus:
+      allOf:
+        - $ref: '#/components/schemas/HealthStatus'
+        - type: object
+          properties:
+            components:
+              type: array
+              items:
+                $ref: '#/components/schemas/ComponentHealth'
+            resource_usage:
+              $ref: '#/components/schemas/ResourceUsage'
+            active_connections:
+              type: integer
+            queue_status:
+              type: object
+              properties:
+                pending_downloads:
+                  type: integer
+                active_downloads:
+                  type: integer
+                failed_downloads:
+                  type: integer
+
+    ComponentHealth:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "database"
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy, maintenance]
+        response_time_ms:
+          type: number
+          nullable: true
+        last_check:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+          nullable: true
+        details:
+          type: object
+          additionalProperties: true
+
+    IndexerHealth:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+          enum: [healthy, degraded, down, maintenance]
+        response_time_ms:
+          type: number
+          nullable: true
+        last_check:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+          nullable: true
+        success_rate_24h:
+          type: number
+          description: Success rate over last 24 hours (0-100)
+        active_users:
+          type: integer
+          description: Number of users with this indexer enabled
+
+    IndexerTestResult:
+      type: object
+      properties:
+        indexer_id:
+          type: integer
+        indexer_name:
+          type: string
+        test_timestamp:
+          type: string
+          format: date-time
+        connectivity_test:
+          type: object
+          properties:
+            success:
+              type: boolean
+            response_time_ms:
+              type: number
+            status_code:
+              type: integer
+              nullable: true
+            error_message:
+              type: string
+              nullable: true
+        search_test:
+          type: object
+          nullable: true
+          properties:
+            success:
+              type: boolean
+            query:
+              type: string
+            results_count:
+              type: integer
+            response_time_ms:
+              type: number
+            error_message:
+              type: string
+              nullable: true
+        overall_status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    ResourceUsage:
+      type: object
+      properties:
+        cpu_usage_percent:
+          type: number
+        memory_usage_bytes:
+          type: integer
+        memory_usage_percent:
+          type: number
+        disk_usage_bytes:
+          type: integer
+        disk_usage_percent:
+          type: number
+        network_rx_bytes:
+          type: integer
+        network_tx_bytes:
+          type: integer
+
+    # ===================================================================
+    # METRICS SCHEMAS
+    # ===================================================================
+
+    SystemMetrics:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        period:
+          type: string
+        system:
+          $ref: '#/components/schemas/SystemResourceMetrics'
+        application:
+          type: object
+          properties:
+            total_users:
+              type: integer
+            active_users_24h:
+              type: integer
+            total_books:
+              type: integer
+            total_downloads:
+              type: integer
+            successful_downloads:
+              type: integer
+            failed_downloads:
+              type: integer
+            total_searches:
+              type: integer
+            cache_hit_rate:
+              type: number
+        performance:
+          type: object
+          properties:
+            avg_response_time_ms:
+              type: number
+            p95_response_time_ms:
+              type: number
+            requests_per_second:
+              type: number
+            errors_per_minute:
+              type: number
+
+    SystemResourceMetrics:
+      type: object
+      properties:
+        cpu:
+          type: object
+          properties:
+            usage_percent:
+              type: number
+            load_average:
+              type: array
+              items:
+                type: number
+              minItems: 3
+              maxItems: 3
+            cores:
+              type: integer
+        memory:
+          type: object
+          properties:
+            total_bytes:
+              type: integer
+            used_bytes:
+              type: integer
+            available_bytes:
+              type: integer
+            usage_percent:
+              type: number
+            swap_total_bytes:
+              type: integer
+            swap_used_bytes:
+              type: integer
+        disk:
+          type: object
+          properties:
+            total_bytes:
+              type: integer
+            used_bytes:
+              type: integer
+            available_bytes:
+              type: integer
+            usage_percent:
+              type: number
+            iops:
+              type: number
+        network:
+          type: object
+          properties:
+            bytes_sent:
+              type: integer
+            bytes_received:
+              type: integer
+            packets_sent:
+              type: integer
+            packets_received:
+              type: integer
+            connections_active:
+              type: integer
+
+    DownloadMetrics:
+      type: object
+      properties:
+        period:
+          type: string
+        total_downloads:
+          type: integer
+        successful_downloads:
+          type: integer
+        failed_downloads:
+          type: integer
+        cancelled_downloads:
+          type: integer
+        success_rate:
+          type: number
+        total_bytes_downloaded:
+          type: integer
+        average_download_speed_kbps:
+          type: number
+        average_file_size_mb:
+          type: number
+        queue_metrics:
+          type: object
+          properties:
+            average_queue_time_minutes:
+              type: number
+            max_queue_time_minutes:
+              type: number
+            current_queue_size:
+              type: integer
+            concurrent_downloads_avg:
+              type: number
+        format_breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              format:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: number
+        indexer_breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              indexer_name:
+                type: string
+              count:
+                type: integer
+              success_rate:
+                type: number
+
+    SearchMetrics:
+      type: object
+      properties:
+        period:
+          type: string
+        total_searches:
+          type: integer
+        unique_queries:
+          type: integer
+        cache_hits:
+          type: integer
+        cache_hit_rate:
+          type: number
+        average_response_time_ms:
+          type: number
+        average_results_per_search:
+          type: number
+        indexer_performance:
+          type: array
+          items:
+            type: object
+            properties:
+              indexer_name:
+                type: string
+              searches_count:
+                type: integer
+              average_response_time_ms:
+                type: number
+              success_rate:
+                type: number
+              average_results:
+                type: number
+        popular_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              query:
+                type: string
+              count:
+                type: integer
+              last_searched:
+                type: string
+                format: date-time
+
+    # ===================================================================
+    # CONFIGURATION SCHEMAS
+    # ===================================================================
+
+    ConfigurationSetting:
+      type: object
+      properties:
+        key:
+          type: string
+          example: "max_concurrent_downloads"
+        value:
+          type: string
+          example: "3"
+        description:
+          type: string
+          example: "Maximum number of simultaneous downloads"
+        category:
+          type: string
+          example: "downloads"
+        data_type:
+          type: string
+          enum: [string, integer, boolean, json]
+        is_sensitive:
+          type: boolean
+          description: Whether this setting contains sensitive data
+        is_encrypted:
+          type: boolean
+          description: Whether the value is encrypted in storage
+        default_value:
+          type: string
+          nullable: true
+        validation_rules:
+          type: object
+          nullable: true
+          properties:
+            min_value:
+              type: number
+              nullable: true
+            max_value:
+              type: number
+              nullable: true
+            allowed_values:
+              type: array
+              items:
+                type: string
+              nullable: true
+            pattern:
+              type: string
+              nullable: true
+        requires_restart:
+          type: boolean
+          description: Whether changing this setting requires a restart
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ===================================================================
+    # INDEXER MANAGEMENT SCHEMAS
+    # ===================================================================
+
+    IndexerConfiguration:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "Library Genesis"
+        base_url:
+          type: string
+          example: "https://libgen.rs"
+        api_endpoint:
+          type: string
+          nullable: true
+          example: "/api/search"
+        indexer_type:
+          type: string
+          enum: [public, private, semi-private]
+        supports_search:
+          type: boolean
+        supports_download:
+          type: boolean
+        is_active:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        rate_limit_requests:
+          type: integer
+          example: 60
+        rate_limit_window:
+          type: integer
+          example: 60
+        timeout_seconds:
+          type: integer
+          example: 30
+        user_agent:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        health_status:
+          type: string
+          enum: [healthy, degraded, down, maintenance]
+          nullable: true
+        last_health_check:
+          type: string
+          format: date-time
+          nullable: true
+        active_users:
+          type: integer
+          description: Number of users with this indexer enabled
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    IndexerDetails:
+      allOf:
+        - $ref: '#/components/schemas/IndexerConfiguration'
+        - type: object
+          properties:
+            health_history:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  status:
+                    type: string
+                    enum: [healthy, degraded, down, maintenance]
+                  response_time_ms:
+                    type: number
+                    nullable: true
+                  error_message:
+                    type: string
+                    nullable: true
+              description: Only included if requested
+            usage_stats:
+              type: object
+              properties:
+                searches_24h:
+                  type: integer
+                downloads_24h:
+                  type: integer
+                success_rate_24h:
+                  type: number
+                average_response_time_24h:
+                  type: number
+
+    IndexerCreate:
+      type: object
+      required: [name, base_url, indexer_type]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        base_url:
+          type: string
+          format: uri
+        api_endpoint:
+          type: string
+          nullable: true
+        indexer_type:
+          type: string
+          enum: [public, private, semi-private]
+        supports_search:
+          type: boolean
+          default: true
+        supports_download:
+          type: boolean
+          default: true
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+        rate_limit_requests:
+          type: integer
+          minimum: 1
+          default: 60
+        rate_limit_window:
+          type: integer
+          minimum: 1
+          default: 60
+        timeout_seconds:
+          type: integer
+          minimum: 5
+          maximum: 300
+          default: 30
+        user_agent:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        website:
+          type: string
+          format: uri
+          nullable: true
+
+    IndexerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        base_url:
+          type: string
+          format: uri
+        api_endpoint:
+          type: string
+          nullable: true
+        indexer_type:
+          type: string
+          enum: [public, private, semi-private]
+        supports_search:
+          type: boolean
+        supports_download:
+          type: boolean
+        is_active:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        rate_limit_requests:
+          type: integer
+          minimum: 1
+        rate_limit_window:
+          type: integer
+          minimum: 1
+        timeout_seconds:
+          type: integer
+          minimum: 5
+          maximum: 300
+        user_agent:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        website:
+          type: string
+          format: uri
+          nullable: true
+
+    # ===================================================================
+    # MAINTENANCE SCHEMAS
+    # ===================================================================
+
+    ScheduledTask:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "cleanup_logs"
+        description:
+          type: string
+          example: "Remove old log entries"
+        task_type:
+          type: string
+          enum: [cleanup, health_check, statistics, backup]
+        schedule_cron:
+          type: string
+          example: "0 2 * * *"
+        is_enabled:
+          type: boolean
+        last_run:
+          type: string
+          format: date-time
+          nullable: true
+        last_run_status:
+          type: string
+          enum: [success, failed, running]
+          nullable: true
+        last_run_duration_seconds:
+          type: integer
+          nullable: true
+        last_error_message:
+          type: string
+          nullable: true
+        next_run:
+          type: string
+          format: date-time
+          nullable: true
+        run_count:
+          type: integer
+        failure_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MaintenanceTask:
+      type: object
+      properties:
+        id:
+          type: string
+        task_name:
+          type: string
+        task_type:
+          type: string
+          enum: [vacuum, reindex, analyze, cleanup, backup]
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        estimated_completion:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        details:
+          type: object
+          additionalProperties: true
+
+    MaintenanceTaskStatus:
+      type: object
+      properties:
+        task_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        duration_seconds:
+          type: number
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        result:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    BackupRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        backup_type:
+          type: string
+          enum: [full, database_only, config_only]
+        file_path:
+          type: string
+        file_size_bytes:
+          type: integer
+        file_size_human:
+          type: string
+          example: "1.2 GB"
+        compression_type:
+          type: string
+          enum: [none, gzip, bzip2]
+          nullable: true
+        checksum:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [completed, failed, in_progress]
+        duration_seconds:
+          type: integer
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ===================================================================
+    # USER ADMINISTRATION SCHEMAS
+    # ===================================================================
+
+    AdminUserView:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        is_admin:
+          type: boolean
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        stats:
+          type: object
+          properties:
+            total_books:
+              type: integer
+            total_downloads:
+              type: integer
+            successful_downloads:
+              type: integer
+            failed_downloads:
+              type: integer
+            storage_used_bytes:
+              type: integer
+
+    AdminUserDetails:
+      allOf:
+        - $ref: '#/components/schemas/AdminUserView'
+        - type: object
+          properties:
+            preferences:
+              type: object
+              additionalProperties: true
+            download_folders:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  path:
+                    type: string
+                  is_default:
+                    type: boolean
+            quality_profiles:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  is_default:
+                    type: boolean
+            recent_activity:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  activity_type:
+                    type: string
+                    enum: [login, search, download, upload, settings_change]
+                  details:
+                    type: string
+              description: Only included if requested
+
+    UserCreate:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9_-]+$'
+        email:
+          type: string
+          format: email
+          nullable: true
+        password:
+          type: string
+          minLength: 8
+          format: password
+        is_admin:
+          type: boolean
+          default: false
+        is_active:
+          type: boolean
+          default: true
+        send_welcome_email:
+          type: boolean
+          default: false
+
+    AdminUserUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9_-]+$'
+        email:
+          type: string
+          format: email
+          nullable: true
+        is_admin:
+          type: boolean
+        is_active:
+          type: boolean
+        reset_password:
+          type: boolean
+          default: false
+          description: Force password reset on next login
+        new_password:
+          type: string
+          minLength: 8
+          format: password
+          description: Set new password (optional)
+
+    AdminStatistics:
+      type: object
+      properties:
+        period:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        users:
+          type: object
+          properties:
+            total_users:
+              type: integer
+            active_users:
+              type: integer
+            new_users:
+              type: integer
+            admin_users:
+              type: integer
+        library:
+          type: object
+          properties:
+            total_books:
+              type: integer
+            total_authors:
+              type: integer
+            total_series:
+              type: integer
+            books_added:
+              type: integer
+            storage_used_bytes:
+              type: integer
+        downloads:
+          type: object
+          properties:
+            total_downloads:
+              type: integer
+            successful_downloads:
+              type: integer
+            failed_downloads:
+              type: integer
+            bytes_downloaded:
+              type: integer
+            average_download_speed_kbps:
+              type: number
+        searches:
+          type: object
+          properties:
+            total_searches:
+              type: integer
+            unique_queries:
+              type: integer
+            cache_hit_rate:
+              type: number
+        indexers:
+          type: object
+          properties:
+            total_indexers:
+              type: integer
+            active_indexers:
+              type: integer
+            healthy_indexers:
+              type: integer
+            average_response_time_ms:
+              type: number
+        system:
+          type: object
+          properties:
+            uptime_seconds:
+              type: integer
+            cpu_usage_percent:
+              type: number
+            memory_usage_percent:
+              type: number
+            disk_usage_percent:
+              type: number
+
+    # ===================================================================
+    # COMMON SCHEMAS
+    # ===================================================================
+
+    PaginationInfo:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        per_page:
+          type: integer
+        total_pages:
+          type: integer
+        total_items:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference that identifies the problem type
+        title:
+          type: string
+          description: A short, human-readable summary of the problem
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence
+        instance:
+          type: string
+          format: uri
+          description: URI reference that identifies the specific occurrence
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - Invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Not Found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Health Monitoring
+    description: System health checks and component status monitoring
+  - name: Performance Metrics
+    description: System performance metrics and statistics
+  - name: Configuration Management
+    description: System configuration and settings management
+  - name: Indexer Management
+    description: Indexer configuration and management operations
+  - name: Maintenance Operations
+    description: System maintenance, cleanup, and backup operations
+  - name: User Administration
+    description: User management and system administration (admin only)

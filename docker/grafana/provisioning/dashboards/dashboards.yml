@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: 'FolioFox Dashboards'
+    orgId: 1
+    folder: 'FolioFox'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,1644 @@
+asyncapi: 3.0.0
+info:
+  title: FolioFox WebSocket API
+  version: 1.0.0
+  description: |
+    Real-time WebSocket API for FolioFox providing live updates for downloads,
+    search results, system status, and user interface events.
+    
+    ## Features
+    - **Download Progress**: Real-time download progress and status updates
+    - **Queue Management**: Live queue status and changes
+    - **Search Results**: Streaming search results as they arrive from indexers
+    - **System Monitoring**: Live system health and performance metrics
+    - **User Notifications**: Real-time notifications and alerts
+    - **Library Updates**: Live updates when books are added or modified
+    
+    ## Connection Management
+    - Automatic reconnection with exponential backoff
+    - Heartbeat/ping-pong for connection health
+    - Authentication via JWT tokens
+    - Room-based subscriptions for targeted updates
+    
+    ## Message Format
+    All messages follow a consistent JSON format with message types,
+    timestamps, and structured payloads for type safety.
+  contact:
+    name: FolioFox WebSocket Support
+    url: https://github.com/foliofox/foliofox
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  development:
+    host: localhost:8080
+    protocol: ws
+    description: Development WebSocket server
+    variables:
+      port:
+        default: '8080'
+  production:
+    host: api.foliofox.local
+    protocol: wss
+    description: Production WebSocket server (SSL)
+
+defaultContentType: application/json
+
+channels:
+  # ===================================================================
+  # CONNECTION MANAGEMENT
+  # ===================================================================
+  
+  connection:
+    address: '/ws'
+    messages:
+      connect:
+        $ref: '#/components/messages/Connect'
+      connected:
+        $ref: '#/components/messages/Connected'
+      authenticate:
+        $ref: '#/components/messages/Authenticate'
+      authenticated:
+        $ref: '#/components/messages/Authenticated'
+      heartbeat:
+        $ref: '#/components/messages/Heartbeat'
+      error:
+        $ref: '#/components/messages/Error'
+      disconnect:
+        $ref: '#/components/messages/Disconnect'
+    description: |
+      Main WebSocket connection channel for authentication and connection management.
+      
+      ## Connection Flow
+      1. Client connects to WebSocket endpoint
+      2. Server sends 'connected' message with connection ID
+      3. Client sends 'authenticate' with JWT token
+      4. Server responds with 'authenticated' and user info
+      5. Client can then subscribe to specific channels
+      
+      ## Heartbeat
+      - Client should send heartbeat every 30 seconds
+      - Server responds with heartbeat acknowledgment
+      - Connection closed if no heartbeat received for 90 seconds
+
+  # ===================================================================
+  # DOWNLOAD UPDATES
+  # ===================================================================
+  
+  downloads/progress:
+    address: '/ws/downloads/progress'
+    messages:
+      subscribe:
+        $ref: '#/components/messages/SubscribeDownloadProgress'
+      progress_update:
+        $ref: '#/components/messages/DownloadProgressUpdate'
+      status_change:
+        $ref: '#/components/messages/DownloadStatusChange'
+      completed:
+        $ref: '#/components/messages/DownloadCompleted'
+      failed:
+        $ref: '#/components/messages/DownloadFailed'
+      unsubscribe:
+        $ref: '#/components/messages/UnsubscribeDownloadProgress'
+    description: |
+      Real-time download progress and status updates channel.
+      
+      Provides live updates for:
+      - Download progress percentages
+      - Status changes (pending → downloading → completed)
+      - Speed and ETA information
+      - Error notifications
+      - Queue position changes
+
+  downloads/queue:
+    address: '/ws/downloads/queue'
+    messages:
+      subscribe:
+        $ref: '#/components/messages/SubscribeDownloadQueue'
+      queue_update:
+        $ref: '#/components/messages/DownloadQueueUpdate'
+      item_added:
+        $ref: '#/components/messages/DownloadQueueItemAdded'
+      item_removed:
+        $ref: '#/components/messages/DownloadQueueItemRemoved'
+      priority_changed:
+        $ref: '#/components/messages/DownloadPriorityChanged'
+      unsubscribe:
+        $ref: '#/components/messages/UnsubscribeDownloadQueue'
+    description: |
+      Live download queue management updates.
+      
+      Notifications for:
+      - New items added to queue
+      - Items removed or completed
+      - Priority changes
+      - Queue reordering
+      - Batch operations
+
+  # ===================================================================
+  # SEARCH UPDATES
+  # ===================================================================
+  
+  search/results:
+    address: '/ws/search/results/{searchId}'
+    messages:
+      results_stream:
+        $ref: '#/components/messages/SearchResultsStream'
+      indexer_complete:
+        $ref: '#/components/messages/SearchIndexerComplete'
+      search_complete:
+        $ref: '#/components/messages/SearchComplete'
+      search_error:
+        $ref: '#/components/messages/SearchError'
+    parameters:
+      searchId:
+        description: Unique search request identifier
+        schema:
+          type: string
+    description: |
+      Streaming search results as they arrive from different indexers.
+      
+      ## Search Flow
+      1. Client initiates search via REST API
+      2. Server returns search ID and WebSocket channel
+      3. Client subscribes to search results channel
+      4. Results stream in real-time as indexers respond
+      5. Individual indexer completion notifications
+      6. Final search completion message
+
+  # ===================================================================
+  # SYSTEM MONITORING
+  # ===================================================================
+  
+  system/health:
+    address: '/ws/system/health'
+    messages:
+      subscribe:
+        $ref: '#/components/messages/SubscribeSystemHealth'
+      health_update:
+        $ref: '#/components/messages/SystemHealthUpdate'
+      component_status:
+        $ref: '#/components/messages/ComponentStatusUpdate'
+      alert:
+        $ref: '#/components/messages/SystemAlert'
+      unsubscribe:
+        $ref: '#/components/messages/UnsubscribeSystemHealth'
+    description: |
+      Real-time system health and monitoring updates.
+      
+      Updates include:
+      - Overall system health status
+      - Individual component status changes
+      - Performance metrics
+      - Resource usage alerts
+      - Service availability changes
+
+  system/metrics:
+    address: '/ws/system/metrics'
+    messages:
+      subscribe:
+        $ref: '#/components/messages/SubscribeSystemMetrics'
+      metrics_update:
+        $ref: '#/components/messages/SystemMetricsUpdate'
+      performance_alert:
+        $ref: '#/components/messages/PerformanceAlert'
+      unsubscribe:
+        $ref: '#/components/messages/UnsubscribeSystemMetrics'
+    description: |
+      Live system performance metrics and statistics.
+      
+      Provides:
+      - CPU, memory, disk usage
+      - Download speeds and throughput
+      - API response times
+      - Database performance
+      - Cache hit rates
+
+  # ===================================================================
+  # LIBRARY UPDATES
+  # ===================================================================
+  
+  library/updates:
+    address: '/ws/library/updates'
+    messages:
+      subscribe:
+        $ref: '#/components/messages/SubscribeLibraryUpdates'
+      book_added:
+        $ref: '#/components/messages/BookAdded'
+      book_updated:
+        $ref: '#/components/messages/BookUpdated'
+      book_deleted:
+        $ref: '#/components/messages/BookDeleted'
+      metadata_updated:
+        $ref: '#/components/messages/BookMetadataUpdated'
+      file_added:
+        $ref: '#/components/messages/BookFileAdded'
+      file_deleted:
+        $ref: '#/components/messages/BookFileDeleted'
+      unsubscribe:
+        $ref: '#/components/messages/UnsubscribeLibraryUpdates'
+    description: |
+      Real-time library content updates and changes.
+      
+      Notifications for:
+      - New books added to library
+      - Book metadata updates
+      - File additions/deletions
+      - Book removals
+      - Bulk import progress
+
+  # ===================================================================
+  # USER NOTIFICATIONS
+  # ===================================================================
+  
+  notifications:
+    address: '/ws/notifications'
+    messages:
+      subscribe:
+        $ref: '#/components/messages/SubscribeNotifications'
+      notification:
+        $ref: '#/components/messages/UserNotification'
+      notification_read:
+        $ref: '#/components/messages/NotificationRead'
+      notification_dismissed:
+        $ref: '#/components/messages/NotificationDismissed'
+      bulk_notification:
+        $ref: '#/components/messages/BulkNotification'
+      unsubscribe:
+        $ref: '#/components/messages/UnsubscribeNotifications'
+    description: |
+      User-specific notifications and alerts.
+      
+      Notification types:
+      - Download completion/failure
+      - System maintenance notices
+      - New feature announcements
+      - Error alerts
+      - Security notifications
+
+  # ===================================================================
+  # INDEXER UPDATES
+  # ===================================================================
+  
+  indexers/status:
+    address: '/ws/indexers/status'
+    messages:
+      subscribe:
+        $ref: '#/components/messages/SubscribeIndexerStatus'
+      indexer_health:
+        $ref: '#/components/messages/IndexerHealthUpdate'
+      indexer_added:
+        $ref: '#/components/messages/IndexerAdded'
+      indexer_removed:
+        $ref: '#/components/messages/IndexerRemoved'
+      indexer_config_changed:
+        $ref: '#/components/messages/IndexerConfigChanged'
+      unsubscribe:
+        $ref: '#/components/messages/UnsubscribeIndexerStatus'
+    description: |
+      Live indexer status and configuration updates.
+      
+      Updates for:
+      - Indexer health status changes
+      - New indexers added/removed
+      - Configuration updates
+      - Rate limit changes
+      - Error notifications
+
+operations:
+  # ===================================================================
+  # CONNECTION OPERATIONS
+  # ===================================================================
+  
+  establishConnection:
+    action: send
+    channel:
+      $ref: '#/channels/connection'
+    messages:
+      - $ref: '#/components/messages/Connect'
+    description: Establish WebSocket connection
+
+  authenticateConnection:
+    action: send
+    channel:
+      $ref: '#/channels/connection'
+    messages:
+      - $ref: '#/components/messages/Authenticate'
+    description: Authenticate WebSocket connection with JWT token
+
+  maintainHeartbeat:
+    action: send
+    channel:
+      $ref: '#/channels/connection'
+    messages:
+      - $ref: '#/components/messages/Heartbeat'
+    description: Send periodic heartbeat to maintain connection
+
+  # ===================================================================
+  # DOWNLOAD OPERATIONS
+  # ===================================================================
+  
+  subscribeToDownloadProgress:
+    action: send
+    channel:
+      $ref: '#/channels/downloads/progress'
+    messages:
+      - $ref: '#/components/messages/SubscribeDownloadProgress'
+    description: Subscribe to download progress updates
+
+  receiveDownloadUpdates:
+    action: receive
+    channel:
+      $ref: '#/channels/downloads/progress'
+    messages:
+      - $ref: '#/components/messages/DownloadProgressUpdate'
+      - $ref: '#/components/messages/DownloadStatusChange'
+      - $ref: '#/components/messages/DownloadCompleted'
+      - $ref: '#/components/messages/DownloadFailed'
+    description: Receive real-time download updates
+
+  subscribeToDownloadQueue:
+    action: send
+    channel:
+      $ref: '#/channels/downloads/queue'
+    messages:
+      - $ref: '#/components/messages/SubscribeDownloadQueue'
+    description: Subscribe to download queue updates
+
+  # ===================================================================
+  # SEARCH OPERATIONS
+  # ===================================================================
+  
+  receiveSearchResults:
+    action: receive
+    channel:
+      $ref: '#/channels/search/results'
+    messages:
+      - $ref: '#/components/messages/SearchResultsStream'
+      - $ref: '#/components/messages/SearchIndexerComplete'
+      - $ref: '#/components/messages/SearchComplete'
+    description: Receive streaming search results
+
+  # ===================================================================
+  # SYSTEM MONITORING OPERATIONS
+  # ===================================================================
+  
+  subscribeToSystemHealth:
+    action: send
+    channel:
+      $ref: '#/channels/system/health'
+    messages:
+      - $ref: '#/components/messages/SubscribeSystemHealth'
+    description: Subscribe to system health updates
+
+  receiveSystemUpdates:
+    action: receive
+    channel:
+      $ref: '#/channels/system/health'
+    messages:
+      - $ref: '#/components/messages/SystemHealthUpdate'
+      - $ref: '#/components/messages/ComponentStatusUpdate'
+      - $ref: '#/components/messages/SystemAlert'
+    description: Receive system health and status updates
+
+components:
+  messages:
+    # ===================================================================
+    # CONNECTION MESSAGES
+    # ===================================================================
+    
+    Connect:
+      name: connect
+      title: WebSocket Connection Request
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: connect
+          client_info:
+            type: object
+            properties:
+              user_agent:
+                type: string
+              version:
+                type: string
+              platform:
+                type: string
+        required: [type]
+
+    Connected:
+      name: connected
+      title: WebSocket Connection Established
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: connected
+          connection_id:
+            type: string
+          server_version:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+          heartbeat_interval:
+            type: integer
+            description: Required heartbeat interval in seconds
+        required: [type, connection_id, timestamp]
+
+    Authenticate:
+      name: authenticate
+      title: WebSocket Authentication Request
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: authenticate
+          token:
+            type: string
+            description: JWT authentication token
+        required: [type, token]
+
+    Authenticated:
+      name: authenticated
+      title: WebSocket Authentication Success
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: authenticated
+          user:
+            type: object
+            properties:
+              id:
+                type: integer
+              username:
+                type: string
+              is_admin:
+                type: boolean
+          permissions:
+            type: array
+            items:
+              type: string
+          available_channels:
+            type: array
+            items:
+              type: string
+        required: [type, user]
+
+    Heartbeat:
+      name: heartbeat
+      title: Connection Heartbeat
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: heartbeat
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, timestamp]
+
+    Error:
+      name: error
+      title: WebSocket Error
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: error
+          error_code:
+            type: string
+          error_message:
+            type: string
+          details:
+            type: object
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, error_code, error_message, timestamp]
+
+    Disconnect:
+      name: disconnect
+      title: WebSocket Disconnection
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: disconnect
+          reason:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type]
+
+    # ===================================================================
+    # DOWNLOAD MESSAGES
+    # ===================================================================
+    
+    SubscribeDownloadProgress:
+      name: subscribe_download_progress
+      title: Subscribe to Download Progress
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: subscribe
+          channel:
+            type: string
+            const: download_progress
+          download_ids:
+            type: array
+            items:
+              type: integer
+            description: Specific download IDs to monitor (empty = all user downloads)
+        required: [type, channel]
+
+    DownloadProgressUpdate:
+      name: download_progress_update
+      title: Download Progress Update
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_progress_update
+          download_id:
+            type: integer
+          progress_percentage:
+            type: integer
+            minimum: 0
+            maximum: 100
+          download_speed_bps:
+            type: integer
+          upload_speed_bps:
+            type: integer
+          eta_seconds:
+            type: integer
+            nullable: true
+          bytes_downloaded:
+            type: integer
+          bytes_total:
+            type: integer
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, download_id, progress_percentage, timestamp]
+
+    DownloadStatusChange:
+      name: download_status_change
+      title: Download Status Change
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_status_change
+          download_id:
+            type: integer
+          old_status:
+            type: string
+            enum: [pending, downloading, completed, failed, cancelled, paused]
+          new_status:
+            type: string
+            enum: [pending, downloading, completed, failed, cancelled, paused]
+          reason:
+            type: string
+            nullable: true
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, download_id, old_status, new_status, timestamp]
+
+    DownloadCompleted:
+      name: download_completed
+      title: Download Completed
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_completed
+          download_id:
+            type: integer
+          title:
+            type: string
+          author:
+            type: string
+            nullable: true
+          file_format:
+            type: string
+          file_path:
+            type: string
+          file_size_bytes:
+            type: integer
+          download_duration_seconds:
+            type: integer
+          average_speed_bps:
+            type: integer
+          book_id:
+            type: integer
+            nullable: true
+            description: Associated book ID if matched
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, download_id, title, file_format, timestamp]
+
+    DownloadFailed:
+      name: download_failed
+      title: Download Failed
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_failed
+          download_id:
+            type: integer
+          title:
+            type: string
+          error_message:
+            type: string
+          error_code:
+            type: string
+            nullable: true
+          retry_count:
+            type: integer
+          max_retries:
+            type: integer
+          can_retry:
+            type: boolean
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, download_id, title, error_message, timestamp]
+
+    UnsubscribeDownloadProgress:
+      name: unsubscribe_download_progress
+      title: Unsubscribe from Download Progress
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: unsubscribe
+          channel:
+            type: string
+            const: download_progress
+        required: [type, channel]
+
+    # ===================================================================
+    # DOWNLOAD QUEUE MESSAGES
+    # ===================================================================
+    
+    SubscribeDownloadQueue:
+      name: subscribe_download_queue
+      title: Subscribe to Download Queue Updates
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: subscribe
+          channel:
+            type: string
+            const: download_queue
+        required: [type, channel]
+
+    DownloadQueueUpdate:
+      name: download_queue_update
+      title: Download Queue Update
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_queue_update
+          queue_stats:
+            type: object
+            properties:
+              pending_count:
+                type: integer
+              downloading_count:
+                type: integer
+              completed_count:
+                type: integer
+              failed_count:
+                type: integer
+              total_size_bytes:
+                type: integer
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, queue_stats, timestamp]
+
+    DownloadQueueItemAdded:
+      name: download_queue_item_added
+      title: Download Queue Item Added
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_queue_item_added
+          download:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              author:
+                type: string
+                nullable: true
+              file_format:
+                type: string
+              priority:
+                type: integer
+              status:
+                type: string
+              indexer_name:
+                type: string
+          queue_position:
+            type: integer
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, download, timestamp]
+
+    DownloadQueueItemRemoved:
+      name: download_queue_item_removed
+      title: Download Queue Item Removed
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_queue_item_removed
+          download_id:
+            type: integer
+          reason:
+            type: string
+            enum: [completed, cancelled, failed, deleted]
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, download_id, reason, timestamp]
+
+    DownloadPriorityChanged:
+      name: download_priority_changed
+      title: Download Priority Changed
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: download_priority_changed
+          download_id:
+            type: integer
+          old_priority:
+            type: integer
+          new_priority:
+            type: integer
+          new_queue_position:
+            type: integer
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, download_id, old_priority, new_priority, timestamp]
+
+    UnsubscribeDownloadQueue:
+      name: unsubscribe_download_queue
+      title: Unsubscribe from Download Queue
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: unsubscribe
+          channel:
+            type: string
+            const: download_queue
+        required: [type, channel]
+
+    # ===================================================================
+    # SEARCH MESSAGES
+    # ===================================================================
+    
+    SearchResultsStream:
+      name: search_results_stream
+      title: Streaming Search Results
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: search_results_stream
+          search_id:
+            type: string
+          indexer_id:
+            type: integer
+          indexer_name:
+            type: string
+          results:
+            type: array
+            items:
+              type: object
+              properties:
+                title:
+                  type: string
+                author:
+                  type: string
+                  nullable: true
+                format:
+                  type: string
+                file_size_bytes:
+                  type: integer
+                  nullable: true
+                quality_score:
+                  type: integer
+                download_url:
+                  type: string
+                  format: uri
+                metadata:
+                  type: object
+          batch_number:
+            type: integer
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, search_id, indexer_id, indexer_name, results, timestamp]
+
+    SearchIndexerComplete:
+      name: search_indexer_complete
+      title: Search Indexer Complete
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: search_indexer_complete
+          search_id:
+            type: string
+          indexer_id:
+            type: integer
+          indexer_name:
+            type: string
+          total_results:
+            type: integer
+          response_time_ms:
+            type: number
+          success:
+            type: boolean
+          error_message:
+            type: string
+            nullable: true
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, search_id, indexer_id, indexer_name, total_results, success, timestamp]
+
+    SearchComplete:
+      name: search_complete
+      title: Search Complete
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: search_complete
+          search_id:
+            type: string
+          query:
+            type: string
+          total_results:
+            type: integer
+          indexers_searched:
+            type: integer
+          successful_indexers:
+            type: integer
+          total_duration_ms:
+            type: number
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, search_id, query, total_results, timestamp]
+
+    SearchError:
+      name: search_error
+      title: Search Error
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: search_error
+          search_id:
+            type: string
+          error_message:
+            type: string
+          error_code:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, search_id, error_message, timestamp]
+
+    # ===================================================================
+    # SYSTEM HEALTH MESSAGES
+    # ===================================================================
+    
+    SubscribeSystemHealth:
+      name: subscribe_system_health
+      title: Subscribe to System Health Updates
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: subscribe
+          channel:
+            type: string
+            const: system_health
+          components:
+            type: array
+            items:
+              type: string
+            description: Specific components to monitor (empty = all)
+        required: [type, channel]
+
+    SystemHealthUpdate:
+      name: system_health_update
+      title: System Health Update
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: system_health_update
+          overall_status:
+            type: string
+            enum: [healthy, degraded, unhealthy]
+          components:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                status:
+                  type: string
+                  enum: [healthy, degraded, unhealthy, maintenance]
+                response_time_ms:
+                  type: number
+                  nullable: true
+                error_message:
+                  type: string
+                  nullable: true
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, overall_status, components, timestamp]
+
+    ComponentStatusUpdate:
+      name: component_status_update
+      title: Component Status Update
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: component_status_update
+          component:
+            type: string
+          old_status:
+            type: string
+            enum: [healthy, degraded, unhealthy, maintenance]
+          new_status:
+            type: string
+            enum: [healthy, degraded, unhealthy, maintenance]
+          details:
+            type: object
+            nullable: true
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, component, old_status, new_status, timestamp]
+
+    SystemAlert:
+      name: system_alert
+      title: System Alert
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: system_alert
+          severity:
+            type: string
+            enum: [info, warning, error, critical]
+          title:
+            type: string
+          message:
+            type: string
+          component:
+            type: string
+            nullable: true
+          action_required:
+            type: boolean
+          suggested_actions:
+            type: array
+            items:
+              type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, severity, title, message, timestamp]
+
+    UnsubscribeSystemHealth:
+      name: unsubscribe_system_health
+      title: Unsubscribe from System Health
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: unsubscribe
+          channel:
+            type: string
+            const: system_health
+        required: [type, channel]
+
+    # ===================================================================
+    # SYSTEM METRICS MESSAGES
+    # ===================================================================
+    
+    SubscribeSystemMetrics:
+      name: subscribe_system_metrics
+      title: Subscribe to System Metrics
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: subscribe
+          channel:
+            type: string
+            const: system_metrics
+          metrics:
+            type: array
+            items:
+              type: string
+            description: Specific metrics to monitor
+          interval_seconds:
+            type: integer
+            minimum: 5
+            maximum: 300
+            default: 30
+        required: [type, channel]
+
+    SystemMetricsUpdate:
+      name: system_metrics_update
+      title: System Metrics Update
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: system_metrics_update
+          metrics:
+            type: object
+            properties:
+              cpu_usage_percent:
+                type: number
+              memory_usage_percent:
+                type: number
+              disk_usage_percent:
+                type: number
+              active_downloads:
+                type: integer
+              download_speed_total_bps:
+                type: integer
+              upload_speed_total_bps:
+                type: integer
+              api_requests_per_minute:
+                type: number
+              cache_hit_rate:
+                type: number
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, metrics, timestamp]
+
+    PerformanceAlert:
+      name: performance_alert
+      title: Performance Alert
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: performance_alert
+          metric:
+            type: string
+          current_value:
+            type: number
+          threshold_value:
+            type: number
+          severity:
+            type: string
+            enum: [warning, critical]
+          message:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, metric, current_value, threshold_value, severity, timestamp]
+
+    UnsubscribeSystemMetrics:
+      name: unsubscribe_system_metrics
+      title: Unsubscribe from System Metrics
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: unsubscribe
+          channel:
+            type: string
+            const: system_metrics
+        required: [type, channel]
+
+    # ===================================================================
+    # LIBRARY UPDATE MESSAGES
+    # ===================================================================
+    
+    SubscribeLibraryUpdates:
+      name: subscribe_library_updates
+      title: Subscribe to Library Updates
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: subscribe
+          channel:
+            type: string
+            const: library_updates
+        required: [type, channel]
+
+    BookAdded:
+      name: book_added
+      title: Book Added to Library
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: book_added
+          book:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              authors:
+                type: array
+                items:
+                  type: string
+              formats:
+                type: array
+                items:
+                  type: string
+              cover_url:
+                type: string
+                nullable: true
+          user_id:
+            type: integer
+            description: User who added the book
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, book, timestamp]
+
+    BookUpdated:
+      name: book_updated
+      title: Book Updated
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: book_updated
+          book_id:
+            type: integer
+          changes:
+            type: object
+            properties:
+              fields_updated:
+                type: array
+                items:
+                  type: string
+              metadata_enriched:
+                type: boolean
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, book_id, changes, timestamp]
+
+    BookDeleted:
+      name: book_deleted
+      title: Book Deleted from Library
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: book_deleted
+          book_id:
+            type: integer
+          title:
+            type: string
+          user_id:
+            type: integer
+          files_deleted:
+            type: boolean
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, book_id, title, timestamp]
+
+    BookMetadataUpdated:
+      name: book_metadata_updated
+      title: Book Metadata Updated
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: book_metadata_updated
+          book_id:
+            type: integer
+          source:
+            type: string
+            description: Source of metadata update
+          fields_updated:
+            type: array
+            items:
+              type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, book_id, source, fields_updated, timestamp]
+
+    BookFileAdded:
+      name: book_file_added
+      title: Book File Added
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: book_file_added
+          book_id:
+            type: integer
+          file:
+            type: object
+            properties:
+              id:
+                type: integer
+              format:
+                type: string
+              file_size_bytes:
+                type: integer
+              quality_score:
+                type: integer
+              is_primary:
+                type: boolean
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, book_id, file, timestamp]
+
+    BookFileDeleted:
+      name: book_file_deleted
+      title: Book File Deleted
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: book_file_deleted
+          book_id:
+            type: integer
+          file_id:
+            type: integer
+          format:
+            type: string
+          deleted_from_disk:
+            type: boolean
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, book_id, file_id, format, timestamp]
+
+    UnsubscribeLibraryUpdates:
+      name: unsubscribe_library_updates
+      title: Unsubscribe from Library Updates
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: unsubscribe
+          channel:
+            type: string
+            const: library_updates
+        required: [type, channel]
+
+    # ===================================================================
+    # NOTIFICATION MESSAGES
+    # ===================================================================
+    
+    SubscribeNotifications:
+      name: subscribe_notifications
+      title: Subscribe to User Notifications
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: subscribe
+          channel:
+            type: string
+            const: notifications
+          notification_types:
+            type: array
+            items:
+              type: string
+            description: Specific notification types to receive
+        required: [type, channel]
+
+    UserNotification:
+      name: user_notification
+      title: User Notification
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: user_notification
+          id:
+            type: string
+          notification_type:
+            type: string
+            enum: [download_complete, download_failed, system_alert, maintenance, announcement, error]
+          priority:
+            type: string
+            enum: [low, normal, high, urgent]
+          title:
+            type: string
+          message:
+            type: string
+          actions:
+            type: array
+            items:
+              type: object
+              properties:
+                label:
+                  type: string
+                action:
+                  type: string
+                url:
+                  type: string
+                  nullable: true
+          auto_dismiss_seconds:
+            type: integer
+            nullable: true
+          persistent:
+            type: boolean
+            default: false
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, id, notification_type, priority, title, message, timestamp]
+
+    NotificationRead:
+      name: notification_read
+      title: Notification Read
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: notification_read
+          notification_id:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, notification_id, timestamp]
+
+    NotificationDismissed:
+      name: notification_dismissed
+      title: Notification Dismissed
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: notification_dismissed
+          notification_id:
+            type: string
+          action:
+            type: string
+            nullable: true
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, notification_id, timestamp]
+
+    BulkNotification:
+      name: bulk_notification
+      title: Bulk Notification
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: bulk_notification
+          notification_type:
+            type: string
+          count:
+            type: integer
+          summary:
+            type: string
+          details_url:
+            type: string
+            nullable: true
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, notification_type, count, summary, timestamp]
+
+    UnsubscribeNotifications:
+      name: unsubscribe_notifications
+      title: Unsubscribe from Notifications
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: unsubscribe
+          channel:
+            type: string
+            const: notifications
+        required: [type, channel]
+
+    # ===================================================================
+    # INDEXER STATUS MESSAGES
+    # ===================================================================
+    
+    SubscribeIndexerStatus:
+      name: subscribe_indexer_status
+      title: Subscribe to Indexer Status Updates
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: subscribe
+          channel:
+            type: string
+            const: indexer_status
+          indexer_ids:
+            type: array
+            items:
+              type: integer
+            description: Specific indexers to monitor (empty = all)
+        required: [type, channel]
+
+    IndexerHealthUpdate:
+      name: indexer_health_update
+      title: Indexer Health Update
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: indexer_health_update
+          indexer_id:
+            type: integer
+          indexer_name:
+            type: string
+          old_status:
+            type: string
+            enum: [healthy, degraded, down, maintenance]
+          new_status:
+            type: string
+            enum: [healthy, degraded, down, maintenance]
+          response_time_ms:
+            type: number
+            nullable: true
+          error_message:
+            type: string
+            nullable: true
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, indexer_id, indexer_name, old_status, new_status, timestamp]
+
+    IndexerAdded:
+      name: indexer_added
+      title: Indexer Added
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: indexer_added
+          indexer:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              indexer_type:
+                type: string
+              is_active:
+                type: boolean
+              priority:
+                type: integer
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, indexer, timestamp]
+
+    IndexerRemoved:
+      name: indexer_removed
+      title: Indexer Removed
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: indexer_removed
+          indexer_id:
+            type: integer
+          indexer_name:
+            type: string
+          reason:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, indexer_id, indexer_name, timestamp]
+
+    IndexerConfigChanged:
+      name: indexer_config_changed
+      title: Indexer Configuration Changed
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: indexer_config_changed
+          indexer_id:
+            type: integer
+          indexer_name:
+            type: string
+          changes:
+            type: array
+            items:
+              type: string
+          timestamp:
+            type: string
+            format: date-time
+        required: [type, indexer_id, indexer_name, changes, timestamp]
+
+    UnsubscribeIndexerStatus:
+      name: unsubscribe_indexer_status
+      title: Unsubscribe from Indexer Status
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            const: unsubscribe
+          channel:
+            type: string
+            const: indexer_status
+        required: [type, channel]

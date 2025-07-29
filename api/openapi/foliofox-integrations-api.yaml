@@ -1,0 +1,1999 @@
+openapi: 3.0.3
+info:
+  title: FolioFox External Integrations API
+  description: |
+    External integration contracts for FolioFox integrating with indexer services
+    and download clients.
+    
+    This API defines the integration patterns and contracts for:
+    - **Prowlarr Integration**: Search and indexer management through Prowlarr
+    - **Jackett Integration**: Direct Jackett API communication for torrent indexers
+    - **Torrent Client Integration**: Support for various torrent clients (qBittorrent, Transmission, Deluge)
+    - **Direct Indexer Integration**: Native support for popular eBook indexers
+    - **Metadata Services**: Integration with book metadata services (Goodreads, Google Books, OpenLibrary)
+    
+    ## Integration Architecture
+    FolioFox supports multiple integration patterns:
+    1. **Direct Integration**: Native API clients for major indexers
+    2. **Proxy Integration**: Through services like Prowlarr and Jackett
+    3. **Hybrid Integration**: Combining multiple sources for comprehensive coverage
+    
+    ## Authentication
+    - Internal API calls use bearer token authentication
+    - External service integrations use their respective authentication methods
+    - API keys and credentials are stored securely and never exposed in responses
+    
+    ## Rate Limiting & Respect
+    - All integrations respect external service rate limits
+    - Configurable delays and retry policies
+    - Health monitoring to detect and respond to service issues
+  version: 1.0.0
+  contact:
+    name: FolioFox Integrations Support
+    url: https://github.com/foliofox/foliofox
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1/integrations
+    description: Development server
+  - url: https://api.foliofox.local/v1/integrations
+    description: Local production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ===================================================================
+  # PROWLARR INTEGRATION
+  # ===================================================================
+
+  /prowlarr/config:
+    get:
+      tags: [Prowlarr Integration]
+      summary: Get Prowlarr configuration
+      description: Retrieve current Prowlarr integration configuration
+      responses:
+        '200':
+          description: Prowlarr configuration retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProwlarrConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Prowlarr Integration]
+      summary: Update Prowlarr configuration
+      description: Configure Prowlarr integration settings and credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProwlarrConfigUpdate'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProwlarrConfig'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /prowlarr/test:
+    post:
+      tags: [Prowlarr Integration]
+      summary: Test Prowlarr connection
+      description: Test connectivity and authentication with Prowlarr instance
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timeout_seconds:
+                  type: integer
+                  minimum: 5
+                  maximum: 60
+                  default: 30
+      responses:
+        '200':
+          description: Connection test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProwlarrTestResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /prowlarr/indexers:
+    get:
+      tags: [Prowlarr Integration]
+      summary: Get Prowlarr indexers
+      description: Retrieve list of indexers configured in Prowlarr
+      parameters:
+        - name: enabled_only
+          in: query
+          description: Only return enabled indexers
+          schema:
+            type: boolean
+            default: false
+        - name: sync_local
+          in: query
+          description: Sync with local indexer configuration
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Prowlarr indexers retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  indexers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProwlarrIndexer'
+                  sync_status:
+                    type: object
+                    nullable: true
+                    properties:
+                      local_indexers:
+                        type: integer
+                      prowlarr_indexers:
+                        type: integer
+                      synchronized:
+                        type: integer
+                      needs_sync:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Prowlarr service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /prowlarr/search:
+    post:
+      tags: [Prowlarr Integration]
+      summary: Search through Prowlarr
+      description: |
+        Perform search across Prowlarr-configured indexers. This proxies the search
+        request through Prowlarr and aggregates results from multiple indexers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProwlarrSearchRequest'
+      responses:
+        '200':
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProwlarrSearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /prowlarr/sync:
+    post:
+      tags: [Prowlarr Integration]
+      summary: Sync Prowlarr indexers
+      description: |
+        Synchronize local indexer configuration with Prowlarr. This will add
+        new indexers found in Prowlarr and update existing ones.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force_update:
+                  type: boolean
+                  default: false
+                  description: Force update of existing indexers
+                import_disabled:
+                  type: boolean
+                  default: false
+                  description: Also import disabled indexers
+      responses:
+        '200':
+          description: Synchronization completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sync_results:
+                    type: object
+                    properties:
+                      added:
+                        type: integer
+                      updated:
+                        type: integer
+                      skipped:
+                        type: integer
+                      errors:
+                        type: integer
+                  indexer_changes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        prowlarr_id:
+                          type: integer
+                        name:
+                          type: string
+                        action:
+                          type: string
+                          enum: [added, updated, skipped, error]
+                        error_message:
+                          type: string
+                          nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================================================================
+  # JACKETT INTEGRATION
+  # ===================================================================
+
+  /jackett/config:
+    get:
+      tags: [Jackett Integration]
+      summary: Get Jackett configuration
+      description: Retrieve current Jackett integration configuration
+      responses:
+        '200':
+          description: Jackett configuration retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JackettConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Jackett Integration]
+      summary: Update Jackett configuration
+      description: Configure Jackett integration settings and API key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JackettConfigUpdate'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JackettConfig'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /jackett/test:
+    post:
+      tags: [Jackett Integration]
+      summary: Test Jackett connection
+      description: Test connectivity and API key with Jackett instance
+      responses:
+        '200':
+          description: Connection test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JackettTestResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /jackett/indexers:
+    get:
+      tags: [Jackett Integration]
+      summary: Get Jackett indexers
+      description: Retrieve list of indexers configured in Jackett
+      parameters:
+        - name: configured_only
+          in: query
+          description: Only return configured indexers
+          schema:
+            type: boolean
+            default: true
+        - name: test_all
+          in: query
+          description: Test all indexers and include status
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Jackett indexers retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  indexers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JackettIndexer'
+                  summary:
+                    type: object
+                    properties:
+                      total_indexers:
+                        type: integer
+                      configured_indexers:
+                        type: integer
+                      working_indexers:
+                        type: integer
+                      error_indexers:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /jackett/search:
+    post:
+      tags: [Jackett Integration]
+      summary: Search through Jackett
+      description: |
+        Perform search across Jackett-configured indexers. Supports both
+        aggregate search across all indexers and targeted search on specific trackers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JackettSearchRequest'
+      responses:
+        '200':
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JackettSearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ===================================================================
+  # TORRENT CLIENT INTEGRATION
+  # ===================================================================
+
+  /torrent-clients:
+    get:
+      tags: [Torrent Clients]
+      summary: List configured torrent clients
+      description: Get list of all configured torrent clients
+      responses:
+        '200':
+          description: Torrent clients retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clients:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TorrentClient'
+                  default_client_id:
+                    type: integer
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Torrent Clients]
+      summary: Add torrent client
+      description: Configure a new torrent client for downloads
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TorrentClientCreate'
+      responses:
+        '201':
+          description: Torrent client added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TorrentClient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /torrent-clients/{client_id}:
+    get:
+      tags: [Torrent Clients]
+      summary: Get torrent client details
+      description: Get detailed information about a specific torrent client
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: include_status
+          in: query
+          description: Include current connection status
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Torrent client details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TorrentClientDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Torrent Clients]
+      summary: Update torrent client
+      description: Update torrent client configuration
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TorrentClientUpdate'
+      responses:
+        '200':
+          description: Torrent client updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TorrentClient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Torrent Clients]
+      summary: Remove torrent client
+      description: Remove a torrent client configuration
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Torrent client removed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot remove - client has active torrents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /torrent-clients/{client_id}/test:
+    post:
+      tags: [Torrent Clients]
+      summary: Test torrent client connection
+      description: Test connectivity and authentication with torrent client
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Connection test completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TorrentClientTestResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /torrent-clients/{client_id}/torrents:
+    get:
+      tags: [Torrent Clients]
+      summary: List torrents
+      description: Get list of torrents from the torrent client
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          description: Filter by torrent status
+          schema:
+            type: string
+            enum: [downloading, seeding, paused, error, completed]
+        - name: category
+          in: query
+          description: Filter by category (if supported by client)
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        '200':
+          description: Torrents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  torrents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TorrentInfo'
+                  summary:
+                    type: object
+                    properties:
+                      total_torrents:
+                        type: integer
+                      downloading:
+                        type: integer
+                      seeding:
+                        type: integer
+                      paused:
+                        type: integer
+                      completed:
+                        type: integer
+                      total_download_speed:
+                        type: integer
+                      total_upload_speed:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Torrent Clients]
+      summary: Add torrent
+      description: Add a new torrent to the client for downloading
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TorrentAddRequest'
+      responses:
+        '201':
+          description: Torrent added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TorrentInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ===================================================================
+  # DIRECT INDEXER INTEGRATION
+  # ===================================================================
+
+  /direct-indexers:
+    get:
+      tags: [Direct Indexers]
+      summary: List direct indexer integrations
+      description: Get list of native indexer integrations
+      responses:
+        '200':
+          description: Direct indexers retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  indexers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DirectIndexer'
+                  available_integrations:
+                    type: array
+                    items:
+                      type: string
+                    description: List of available indexer types that can be added
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /direct-indexers/{indexer_type}/search:
+    post:
+      tags: [Direct Indexers]
+      summary: Search direct indexer
+      description: |
+        Perform direct search on a specific indexer type. This bypasses
+        proxy services and communicates directly with the indexer.
+      parameters:
+        - name: indexer_type
+          in: path
+          required: true
+          description: Type of indexer (libgen, zlibrary, anna, etc.)
+          schema:
+            type: string
+            enum: [libgen, zlibrary, anna, mobilism, ebookee]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DirectIndexerSearchRequest'
+      responses:
+        '200':
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirectIndexerSearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Indexer temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ===================================================================
+  # METADATA SERVICES INTEGRATION
+  # ===================================================================
+
+  /metadata/config:
+    get:
+      tags: [Metadata Services]
+      summary: Get metadata service configuration
+      description: Retrieve configuration for all metadata services
+      responses:
+        '200':
+          description: Metadata services configuration retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MetadataService'
+                  default_priority:
+                    type: array
+                    items:
+                      type: string
+                    description: Default service priority order
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Metadata Services]
+      summary: Update metadata service configuration
+      description: Configure metadata services and their priorities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                services:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/MetadataServiceUpdate'
+                default_priority:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MetadataService'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /metadata/lookup:
+    post:
+      tags: [Metadata Services]
+      summary: Lookup book metadata
+      description: |
+        Lookup book metadata from configured services using various identifiers.
+        Services are queried in priority order until sufficient metadata is found.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataLookupRequest'
+      responses:
+        '200':
+          description: Metadata lookup completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataLookupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No metadata found for the provided identifiers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /metadata/enrich:
+    post:
+      tags: [Metadata Services]
+      summary: Enrich existing book metadata
+      description: |
+        Enrich existing book metadata by querying metadata services for
+        additional information and missing fields.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataEnrichRequest'
+      responses:
+        '200':
+          description: Metadata enrichment completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataEnrichResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ===================================================================
+    # PROWLARR INTEGRATION SCHEMAS
+    # ===================================================================
+
+    ProwlarrConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        base_url:
+          type: string
+          example: "http://localhost:9696"
+        api_key:
+          type: string
+          description: Masked in response
+          example: "********"
+        timeout_seconds:
+          type: integer
+          example: 30
+        rate_limit_requests:
+          type: integer
+          example: 60
+        rate_limit_window:
+          type: integer
+          example: 60
+        sync_interval_hours:
+          type: integer
+          example: 24
+        last_sync:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: string
+          nullable: true
+          description: Detected Prowlarr version
+        status:
+          type: string
+          enum: [connected, disconnected, error, not_configured]
+
+    ProwlarrConfigUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        base_url:
+          type: string
+          format: uri
+        api_key:
+          type: string
+          minLength: 32
+        timeout_seconds:
+          type: integer
+          minimum: 5
+          maximum: 300
+        rate_limit_requests:
+          type: integer
+          minimum: 1
+        rate_limit_window:
+          type: integer
+          minimum: 1
+        sync_interval_hours:
+          type: integer
+          minimum: 1
+          maximum: 168
+
+    ProwlarrTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        response_time_ms:
+          type: number
+        version:
+          type: string
+          nullable: true
+        indexer_count:
+          type: integer
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: List of supported Prowlarr capabilities
+
+    ProwlarrIndexer:
+      type: object
+      properties:
+        prowlarr_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        language:
+          type: string
+        type:
+          type: string
+          enum: [public, private, semi-private]
+        protocol:
+          type: string
+          enum: [torrent, usenet]
+        categories:
+          type: array
+          items:
+            type: integer
+          description: Prowlarr category IDs
+        capabilities:
+          type: array
+          items:
+            type: string
+        is_enabled:
+          type: boolean
+        priority:
+          type: integer
+        last_rss_sync:
+          type: string
+          format: date-time
+          nullable: true
+        local_indexer_id:
+          type: integer
+          nullable: true
+          description: ID of corresponding local indexer
+
+    ProwlarrSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          example: "Foundation Isaac Asimov"
+        categories:
+          type: array
+          items:
+            type: integer
+          description: Prowlarr category IDs to search
+        indexer_ids:
+          type: array
+          items:
+            type: integer
+          description: Specific Prowlarr indexer IDs to search
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 100
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+        timeout_seconds:
+          type: integer
+          minimum: 5
+          maximum: 300
+          default: 30
+
+    ProwlarrSearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        total_results:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProwlarrSearchResult'
+        indexer_stats:
+          type: array
+          items:
+            type: object
+            properties:
+              indexer_id:
+                type: integer
+              indexer_name:
+                type: string
+              result_count:
+                type: integer
+              response_time_ms:
+                type: number
+              success:
+                type: boolean
+              error_message:
+                type: string
+                nullable: true
+        search_duration_ms:
+          type: number
+
+    ProwlarrSearchResult:
+      type: object
+      properties:
+        prowlarr_indexer_id:
+          type: integer
+        indexer_name:
+          type: string
+        title:
+          type: string
+        size_bytes:
+          type: integer
+          nullable: true
+        seeders:
+          type: integer
+          nullable: true
+        leechers:
+          type: integer
+          nullable: true
+        category:
+          type: string
+        download_url:
+          type: string
+          format: uri
+        info_url:
+          type: string
+          format: uri
+          nullable: true
+        published_date:
+          type: string
+          format: date-time
+          nullable: true
+        grabs:
+          type: integer
+          nullable: true
+        files:
+          type: integer
+          nullable: true
+
+    # ===================================================================
+    # JACKETT INTEGRATION SCHEMAS
+    # ===================================================================
+
+    JackettConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        base_url:
+          type: string
+          example: "http://localhost:9117"
+        api_key:
+          type: string
+          description: Masked in response
+          example: "********"
+        timeout_seconds:
+          type: integer
+          example: 30
+        rate_limit_requests:
+          type: integer
+          example: 60
+        rate_limit_window:
+          type: integer
+          example: 60
+        version:
+          type: string
+          nullable: true
+          description: Detected Jackett version
+        status:
+          type: string
+          enum: [connected, disconnected, error, not_configured]
+
+    JackettConfigUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        base_url:
+          type: string
+          format: uri
+        api_key:
+          type: string
+          minLength: 32
+        timeout_seconds:
+          type: integer
+          minimum: 5
+          maximum: 300
+        rate_limit_requests:
+          type: integer
+          minimum: 1
+        rate_limit_window:
+          type: integer
+          minimum: 1
+
+    JackettTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        response_time_ms:
+          type: number
+        version:
+          type: string
+          nullable: true
+        indexer_count:
+          type: integer
+          nullable: true
+        configured_indexer_count:
+          type: integer
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+
+    JackettIndexer:
+      type: object
+      properties:
+        jackett_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        language:
+          type: string
+        type:
+          type: string
+        category:
+          type: string
+        is_configured:
+          type: boolean
+        is_working:
+          type: boolean
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    JackettSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          example: "Foundation Isaac Asimov"
+        category:
+          type: string
+          nullable: true
+          description: Jackett category (e.g., "ebooks")
+        tracker:
+          type: string
+          nullable: true
+          description: Specific tracker ID to search
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 100
+
+    JackettSearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        total_results:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/JackettSearchResult'
+        search_duration_ms:
+          type: number
+
+    JackettSearchResult:
+      type: object
+      properties:
+        tracker:
+          type: string
+        title:
+          type: string
+        size_bytes:
+          type: integer
+          nullable: true
+        seeders:
+          type: integer
+          nullable: true
+        leechers:
+          type: integer
+          nullable: true
+        category:
+          type: string
+        download_url:
+          type: string
+          format: uri
+        details_url:
+          type: string
+          format: uri
+          nullable: true
+        published_date:
+          type: string
+          format: date-time
+          nullable: true
+        grabs:
+          type: integer
+          nullable: true
+
+    # ===================================================================
+    # TORRENT CLIENT SCHEMAS
+    # ===================================================================
+
+    TorrentClient:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "qBittorrent"
+        client_type:
+          type: string
+          enum: [qbittorrent, transmission, deluge, rtorrent, utorrent]
+        host:
+          type: string
+          example: "localhost"
+        port:
+          type: integer
+          example: 8080
+        use_ssl:
+          type: boolean
+        username:
+          type: string
+          nullable: true
+        is_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        download_path:
+          type: string
+          nullable: true
+          example: "/downloads/torrents"
+        category:
+          type: string
+          nullable: true
+          example: "ebooks"
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        max_active_downloads:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [connected, disconnected, error]
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TorrentClientCreate:
+      type: object
+      required: [name, client_type, host, port]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        client_type:
+          type: string
+          enum: [qbittorrent, transmission, deluge, rtorrent, utorrent]
+        host:
+          type: string
+          minLength: 1
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        use_ssl:
+          type: boolean
+          default: false
+        username:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+        download_path:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+        max_active_downloads:
+          type: integer
+          minimum: 1
+          nullable: true
+        is_default:
+          type: boolean
+          default: false
+
+    TorrentClientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        host:
+          type: string
+          minLength: 1
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        use_ssl:
+          type: boolean
+        username:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+        download_path:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        max_active_downloads:
+          type: integer
+          minimum: 1
+          nullable: true
+        is_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+
+    TorrentClientDetails:
+      allOf:
+        - $ref: '#/components/schemas/TorrentClient'
+        - type: object
+          properties:
+            connection_info:
+              type: object
+              nullable: true
+              properties:
+                connected:
+                  type: boolean
+                last_check:
+                  type: string
+                  format: date-time
+                response_time_ms:
+                  type: number
+                error_message:
+                  type: string
+                  nullable: true
+            statistics:
+              type: object
+              nullable: true
+              properties:
+                total_torrents:
+                  type: integer
+                active_torrents:
+                  type: integer
+                downloading_torrents:
+                  type: integer
+                seeding_torrents:
+                  type: integer
+                total_download_speed:
+                  type: integer
+                total_upload_speed:
+                  type: integer
+                queue_size:
+                  type: integer
+
+    TorrentClientTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        response_time_ms:
+          type: number
+        version:
+          type: string
+          nullable: true
+        client_info:
+          type: object
+          nullable: true
+          properties:
+            client_version:
+              type: string
+            api_version:
+              type: string
+              nullable: true
+            free_space_bytes:
+              type: integer
+              nullable: true
+        error_message:
+          type: string
+          nullable: true
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    TorrentInfo:
+      type: object
+      properties:
+        hash:
+          type: string
+        name:
+          type: string
+        size_bytes:
+          type: integer
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Download progress (0.0 to 1.0)
+        status:
+          type: string
+          enum: [downloading, seeding, paused, error, completed, checking, allocating]
+        download_speed:
+          type: integer
+          description: Download speed in bytes/sec
+        upload_speed:
+          type: integer
+          description: Upload speed in bytes/sec
+        eta:
+          type: integer
+          nullable: true
+          description: Estimated time to completion in seconds
+        seeders:
+          type: integer
+          nullable: true
+        leechers:
+          type: integer
+          nullable: true
+        ratio:
+          type: number
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        save_path:
+          type: string
+          nullable: true
+        added_date:
+          type: string
+          format: date-time
+        completion_date:
+          type: string
+          format: date-time
+          nullable: true
+
+    TorrentAddRequest:
+      type: object
+      required: [torrent_data]
+      properties:
+        torrent_data:
+          type: string
+          description: Torrent file content (base64 encoded) or magnet link
+        download_path:
+          type: string
+          nullable: true
+          description: Override default download path
+        category:
+          type: string
+          nullable: true
+          description: Torrent category
+        paused:
+          type: boolean
+          default: false
+          description: Add torrent in paused state
+        skip_checking:
+          type: boolean
+          default: false
+          description: Skip hash checking
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal
+        sequential_download:
+          type: boolean
+          default: false
+        first_last_piece_priority:
+          type: boolean
+          default: false
+
+    # ===================================================================
+    # DIRECT INDEXER SCHEMAS
+    # ===================================================================
+
+    DirectIndexer:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [libgen, zlibrary, anna, mobilism, ebookee]
+        name:
+          type: string
+          example: "Library Genesis"
+        description:
+          type: string
+        base_urls:
+          type: array
+          items:
+            type: string
+          description: Available mirror URLs
+        is_enabled:
+          type: boolean
+        supported_formats:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Supported search capabilities
+        rate_limit:
+          type: object
+          properties:
+            requests_per_minute:
+              type: integer
+            delay_seconds:
+              type: number
+        last_check:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [healthy, degraded, down]
+
+    DirectIndexerSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+        author:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        isbn:
+          type: string
+          nullable: true
+        language:
+          type: string
+          nullable: true
+        format:
+          type: string
+          nullable: true
+        year_min:
+          type: integer
+          nullable: true
+        year_max:
+          type: integer
+          nullable: true
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+        sort_by:
+          type: string
+          enum: [relevance, year, size, title]
+          default: relevance
+        sort_order:
+          type: string
+          enum: [asc, desc]
+          default: desc
+
+    DirectIndexerSearchResponse:
+      type: object
+      properties:
+        indexer_type:
+          type: string
+        query:
+          type: string
+        total_results:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectIndexerResult'
+        search_duration_ms:
+          type: number
+        mirror_used:
+          type: string
+          description: Which mirror URL was used for the search
+
+    DirectIndexerResult:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Indexer-specific ID
+        title:
+          type: string
+        author:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        format:
+          type: string
+        file_size_bytes:
+          type: integer
+          nullable: true
+        language:
+          type: string
+          nullable: true
+        year:
+          type: integer
+          nullable: true
+        pages:
+          type: integer
+          nullable: true
+        isbn:
+          type: string
+          nullable: true
+        publisher:
+          type: string
+          nullable: true
+        download_url:
+          type: string
+          format: uri
+        details_url:
+          type: string
+          format: uri
+          nullable: true
+        cover_url:
+          type: string
+          format: uri
+          nullable: true
+        quality_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Estimated quality score
+        tags:
+          type: array
+          items:
+            type: string
+
+    # ===================================================================
+    # METADATA SERVICES SCHEMAS
+    # ===================================================================
+
+    MetadataService:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [goodreads, google_books, open_library, worldcat, isbn_db]
+        display_name:
+          type: string
+          example: "Goodreads"
+        is_enabled:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        api_key:
+          type: string
+          nullable: true
+          description: Masked in response
+        rate_limit:
+          type: object
+          properties:
+            requests_per_minute:
+              type: integer
+            requests_per_day:
+              type: integer
+              nullable: true
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Supported metadata fields
+        last_used:
+          type: string
+          format: date-time
+          nullable: true
+        success_rate:
+          type: number
+          description: Success rate over last 30 days
+
+    MetadataServiceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [goodreads, google_books, open_library, worldcat, isbn_db]
+        is_enabled:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        api_key:
+          type: string
+          nullable: true
+
+    MetadataLookupRequest:
+      type: object
+      properties:
+        isbn_10:
+          type: string
+          nullable: true
+        isbn_13:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        author:
+          type: string
+          nullable: true
+        goodreads_id:
+          type: string
+          nullable: true
+        google_books_id:
+          type: string
+          nullable: true
+        asin:
+          type: string
+          nullable: true
+        services:
+          type: array
+          items:
+            type: string
+          description: Specific services to query (optional)
+        timeout_seconds:
+          type: integer
+          minimum: 5
+          maximum: 60
+          default: 30
+
+    MetadataLookupResponse:
+      type: object
+      properties:
+        found:
+          type: boolean
+        metadata:
+          type: object
+          properties:
+            title:
+              type: string
+              nullable: true
+            subtitle:
+              type: string
+              nullable: true
+            authors:
+              type: array
+              items:
+                type: string
+            description:
+              type: string
+              nullable: true
+            isbn_10:
+              type: string
+              nullable: true
+            isbn_13:
+              type: string
+              nullable: true
+            asin:
+              type: string
+              nullable: true
+            goodreads_id:
+              type: string
+              nullable: true
+            google_books_id:
+              type: string
+              nullable: true
+            publication_date:
+              type: string
+              format: date
+              nullable: true
+            publisher:
+              type: string
+              nullable: true
+            page_count:
+              type: integer
+              nullable: true
+            language:
+              type: string
+              nullable: true
+            genres:
+              type: array
+              items:
+                type: string
+            rating_average:
+              type: number
+              nullable: true
+            rating_count:
+              type: integer
+              nullable: true
+            cover_url:
+              type: string
+              format: uri
+              nullable: true
+            series:
+              type: string
+              nullable: true
+            series_position:
+              type: number
+              nullable: true
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              service:
+                type: string
+              found:
+                type: boolean
+              response_time_ms:
+                type: number
+              fields_provided:
+                type: array
+                items:
+                  type: string
+              error_message:
+                type: string
+                nullable: true
+        confidence_score:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Overall confidence in the metadata accuracy
+
+    MetadataEnrichRequest:
+      type: object
+      required: [book_id]
+      properties:
+        book_id:
+          type: integer
+        force_update:
+          type: boolean
+          default: false
+          description: Update even if metadata is recent
+        services:
+          type: array
+          items:
+            type: string
+          description: Specific services to use for enrichment
+        fields_to_update:
+          type: array
+          items:
+            type: string
+          description: Specific fields to update (optional)
+
+    MetadataEnrichResponse:
+      type: object
+      properties:
+        book_id:
+          type: integer
+        updated:
+          type: boolean
+        fields_updated:
+          type: array
+          items:
+            type: string
+        metadata_changes:
+          type: object
+          additionalProperties: true
+          description: Map of field -> {old_value, new_value}
+        sources_used:
+          type: array
+          items:
+            type: string
+        enrichment_duration_ms:
+          type: number
+
+    # ===================================================================
+    # COMMON SCHEMAS
+    # ===================================================================
+
+    ErrorResponse:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference that identifies the problem type
+        title:
+          type: string
+          description: A short, human-readable summary of the problem
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence
+        instance:
+          type: string
+          format: uri
+          description: URI reference that identifies the specific occurrence
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - Invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Not Found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    RateLimited:
+      description: Too Many Requests - Rate limit exceeded
+      headers:
+        Retry-After:
+          description: Seconds until rate limit resets
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Prowlarr Integration
+    description: Integration with Prowlarr indexer proxy service
+  - name: Jackett Integration
+    description: Integration with Jackett torrent indexer aggregator
+  - name: Torrent Clients
+    description: Torrent client configuration and management
+  - name: Direct Indexers
+    description: Native integrations with eBook indexers
+  - name: Metadata Services
+    description: Book metadata lookup and enrichment services
