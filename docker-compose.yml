@@ -1,5 +1,3 @@
-version: '3.8'
-
 # FolioFox Production Docker Compose Configuration
 # For monitoring: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up
 # For volumes: docker-compose -f docker-compose.yml -f docker-compose.volumes.yml up
