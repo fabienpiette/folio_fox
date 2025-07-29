@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -61,9 +62,10 @@ func (c *ProwlarrClient) TestConnection(ctx context.Context) (*models.IndexerTes
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		errMsg := err.Error()
 		return &models.IndexerTestResult{
 			Success:      false,
-			ErrorMessage: &err.Error(),
+			ErrorMessage: &errMsg,
 		}, nil
 	}
 	defer resp.Body.Close()
@@ -261,6 +263,7 @@ func (c *ProwlarrClient) Search(ctx context.Context, request *models.SearchReque
 		qualityScore := c.calculateQualityScore(result.Seeders, result.Size)
 
 		var publishedDate *time.Time
+		_ = publishedDate // Variable kept for future use
 		if result.PublishDate != nil {
 			if t, err := time.Parse(time.RFC3339, *result.PublishDate); err == nil {
 				publishedDate = &t

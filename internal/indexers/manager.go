@@ -201,7 +201,8 @@ func (m *Manager) searchIndexer(
 		errorsChan <- fmt.Errorf("indexer %s: %w", indexer.Name, err)
 		
 		// Record failed health check
-		m.healthMonitor.RecordHealthCheck(ctx, indexer.ID, models.IndexerStatusDown, nil, &err.Error())
+		errMsg := err.Error()
+		m.healthMonitor.RecordHealthCheck(ctx, indexer.ID, models.IndexerStatusDown, nil, &errMsg)
 		return
 	}
 

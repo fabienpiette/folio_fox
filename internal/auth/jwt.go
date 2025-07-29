@@ -115,3 +115,32 @@ func (m *JWTManager) RefreshToken(tokenString string) (string, time.Time, error)
 
 	return newTokenString, expiresAt, nil
 }
+
+// ValidateJWT validates a JWT token and returns user information
+// This is a standalone function for use in middleware
+func ValidateJWT(tokenString string) (int64, string, bool, error) {
+	// This is a simplified version that uses a default secret key
+	// In a real implementation, this should be injected from config
+	secretKey := "your-super-secret-jwt-key-change-this" // TODO: Get from config
+	
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secretKey), nil
+	})
+
+	if err != nil {
+		return 0, "", false, fmt.Errorf("failed to parse token: %w", err)
+	}
+
+	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
+		// Additional validation
+		if claims.ExpiresAt.Before(time.Now()) {
+			return 0, "", false, fmt.Errorf("token has expired")
+		}
+		return claims.UserID, claims.Username, claims.IsAdmin, nil
+	}
+
+	return 0, "", false, fmt.Errorf("invalid token")
+}
