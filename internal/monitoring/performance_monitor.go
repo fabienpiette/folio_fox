@@ -2,20 +2,16 @@ package monitoring
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"runtime"
-	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/fabienpiette/folio_fox/internal/repositories"
 )
 
 // PerformanceMonitor provides comprehensive system performance monitoring
 type PerformanceMonitor struct {
-	metricsRepo repositories.MetricsRepository
 	logger      *logrus.Logger
 	config      *MonitorConfig
 	
@@ -258,7 +254,6 @@ type MetricsSnapshot struct {
 
 // NewPerformanceMonitor creates a new performance monitor
 func NewPerformanceMonitor(
-	metricsRepo repositories.MetricsRepository,
 	logger *logrus.Logger,
 	config *MonitorConfig,
 ) *PerformanceMonitor {
@@ -281,7 +276,6 @@ func NewPerformanceMonitor(
 	}
 
 	return &PerformanceMonitor{
-		metricsRepo:    metricsRepo,
 		logger:         logger,
 		config:         config,
 		systemMetrics:  &SystemMetrics{},
@@ -602,10 +596,8 @@ func (pm *PerformanceMonitor) exportMetrics() {
 		return
 	}
 
-	// Export to metrics repository
-	if err := pm.metricsRepo.StoreMetrics(context.Background(), current); err != nil {
-		pm.logger.Errorf("Failed to export metrics: %v", err)
-	}
+	// Export to metrics repository (placeholder - would store to actual metrics backend)
+	pm.logger.Debugf("Metrics collected: %+v", current)
 }
 
 // alertProcessingLoop processes alerts

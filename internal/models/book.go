@@ -158,7 +158,11 @@ func (s StringList) Value() (driver.Value, error) {
 	if len(s) == 0 {
 		return "[]", nil
 	}
-	return json.Marshal(s)
+	bytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return string(bytes), nil
 }
 
 // BookCreateRequest represents the request to create a new book

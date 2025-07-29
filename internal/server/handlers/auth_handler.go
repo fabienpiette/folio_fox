@@ -78,7 +78,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Verify password
-	if !auth.VerifyPassword(req.Password, user.PasswordHash) {
+	passwordHasher := h.container.GetPasswordHasher()
+	isValidPassword, err := passwordHasher.VerifyPassword(req.Password, user.PasswordHash)
+	if err != nil || !isValidPassword {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "Invalid credentials",
 		})
@@ -94,7 +96,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	tokenString, expiresIn, err := auth.GenerateJWT(user.ID, user.Username, user.IsAdmin)
+	jwtManager := h.container.GetJWTManager()
+	tokenString, expiresAt, err := jwtManager.GenerateToken(user)
 	if err != nil {
 		h.container.GetLogger().Errorf("Failed to generate JWT: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -115,7 +118,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	response := LoginResponse{
 		AccessToken: tokenString,
 		TokenType:   "Bearer",
-		ExpiresIn:   expiresIn,
+		ExpiresIn:   int(time.Until(expiresAt).Seconds()),
 		User:        user,
 	}
 
@@ -143,8 +146,16 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	// Create user object for token generation
+	user := &models.User{
+		ID:       userID,
+		Username: username,
+		IsAdmin:  isAdmin,
+	}
+	
 	// Generate new access token
-	newToken, expiresIn, err := auth.GenerateJWT(userID, username, isAdmin)
+	jwtManager := h.container.GetJWTManager()
+	newToken, expiresAt, err := jwtManager.GenerateToken(user)
 	if err != nil {
 		h.container.GetLogger().Errorf("Failed to generate JWT: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -155,6 +166,6 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": newToken,
-		"expires_in":   expiresIn,
+		"expires_in":   int(time.Until(expiresAt).Seconds()),
 	})
 }
