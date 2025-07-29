@@ -6,11 +6,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/foliofox/foliofox/internal/config"
-	"github.com/foliofox/foliofox/internal/database"
-	"github.com/foliofox/foliofox/internal/redis"
-	"github.com/foliofox/foliofox/internal/server"
-	"github.com/foliofox/foliofox/internal/services"
+	"github.com/fabienpiette/folio_fox/internal/config"
+	"github.com/fabienpiette/folio_fox/internal/database"
+	"github.com/fabienpiette/folio_fox/internal/redis"
+	"github.com/fabienpiette/folio_fox/internal/server"
+	"github.com/fabienpiette/folio_fox/internal/services"
 	"github.com/sirupsen/logrus"
 )
 

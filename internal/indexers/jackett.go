@@ -13,7 +13,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
-	"github.com/foliofox/foliofox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/models"
 )
 
 // JackettClient handles communication with Jackett API

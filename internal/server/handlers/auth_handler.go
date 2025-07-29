@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/foliofox/foliofox/internal/auth"
-	"github.com/foliofox/foliofox/internal/models"
-	"github.com/foliofox/foliofox/internal/services"
+	"github.com/fabienpiette/folio_fox/internal/auth"
+	"github.com/fabienpiette/folio_fox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/services"
 )
 
 // AuthHandler handles authentication endpoints

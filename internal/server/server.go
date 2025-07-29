@@ -8,10 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/foliofox/foliofox/internal/config"
-	"github.com/foliofox/foliofox/internal/middleware"
-	"github.com/foliofox/foliofox/internal/server/handlers"
-	"github.com/foliofox/foliofox/internal/services"
+	"github.com/fabienpiette/folio_fox/internal/config"
+	"github.com/fabienpiette/folio_fox/internal/middleware"
+	"github.com/fabienpiette/folio_fox/internal/server/handlers"
+	"github.com/fabienpiette/folio_fox/internal/services"
 )
 
 // HTTPServer represents the HTTP server

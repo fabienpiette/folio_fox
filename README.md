@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg)](https://docker.com)
-[![CI/CD](https://github.com/foliofox/foliofox/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/foliofox/foliofox/actions)
+[![CI/CD](https://github.com/fabienpiette/folio_fox/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/fabienpiette/folio_fox/actions)
 
 FolioFox is a comprehensive, self-hosted eBook management system designed for book enthusiasts who want complete control over their digital library. Built with modern technologies and a focus on performance, security, and ease of use.
 
@@ -12,7 +12,7 @@ Get FolioFox running in under 5 minutes:
 
 ```bash
 # Clone the repository
-git clone https://github.com/foliofox/foliofox.git
+git clone https://github.com/fabienpiette/folio_fox.git
 cd foliofox
 
 # Run the setup script (interactive)
@@ -238,7 +238,7 @@ We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTIN
 ### Development Setup
 ```bash
 # Clone repository
-git clone https://github.com/foliofox/foliofox.git
+git clone https://github.com/fabienpiette/folio_fox.git
 cd foliofox
 
 # Start development environment
@@ -255,9 +255,9 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 ## 🆘 Support
 
 ### Community Support
-- **GitHub Issues**: [Report bugs and request features](https://github.com/foliofox/foliofox/issues)
-- **Discussions**: [Community support and questions](https://github.com/foliofox/foliofox/discussions)
-- **Wiki**: [Additional documentation](https://github.com/foliofox/foliofox/wiki)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/fabienpiette/folio_fox/issues)
+- **Discussions**: [Community support and questions](https://github.com/fabienpiette/folio_fox/discussions)
+- **Wiki**: [Additional documentation](https://github.com/fabienpiette/folio_fox/wiki)
 
 ### Professional Support
 For enterprise deployments and professional support:

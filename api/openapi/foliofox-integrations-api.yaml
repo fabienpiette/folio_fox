@@ -30,7 +30,7 @@ info:
   version: 1.0.0
   contact:
     name: FolioFox Integrations Support
-    url: https://github.com/foliofox/foliofox
+    url: https://github.com/fabienpiette/folio_fox
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

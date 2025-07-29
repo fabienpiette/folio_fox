@@ -10,7 +10,7 @@
       "platform": "linux",
       "logo": "https://raw.githubusercontent.com/foliofox/foliofox/main/assets/logo.png",
       "repository": {
-        "url": "https://github.com/foliofox/foliofox",
+        "url": "https://github.com/fabienpiette/folio_fox",
         "stackfile": "docker-compose.yml"
       },
       "env": [
@@ -95,7 +95,7 @@
       "platform": "linux",
       "logo": "https://raw.githubusercontent.com/foliofox/foliofox/main/assets/logo.png",
       "repository": {
-        "url": "https://github.com/foliofox/foliofox",
+        "url": "https://github.com/fabienpiette/folio_fox",
         "stackfile": "docker-compose.yml"
       },
       "env": [
@@ -144,7 +144,7 @@
       "platform": "linux",
       "logo": "https://raw.githubusercontent.com/foliofox/foliofox/main/assets/logo.png",
       "repository": {
-        "url": "https://github.com/foliofox/foliofox",
+        "url": "https://github.com/fabienpiette/folio_fox",
         "stackfile": "docker-compose.yml"
       },
       "env": [

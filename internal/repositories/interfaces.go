@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/foliofox/foliofox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/models"
 )
 
 // UserRepository defines the interface for user data operations

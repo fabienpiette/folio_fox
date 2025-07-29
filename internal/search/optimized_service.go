@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/foliofox/foliofox/internal/indexers"
-	"github.com/foliofox/foliofox/internal/models"
-	"github.com/foliofox/foliofox/internal/repositories"
+	"github.com/fabienpiette/folio_fox/internal/indexers"
+	"github.com/fabienpiette/folio_fox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/repositories"
 )
 
 // OptimizedService provides high-performance search functionality with advanced optimizations

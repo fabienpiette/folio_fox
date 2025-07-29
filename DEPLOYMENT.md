@@ -8,7 +8,7 @@ For the impatient, here's the minimal setup:
 
 ```bash
 # Clone the repository
-git clone https://github.com/foliofox/foliofox.git
+git clone https://github.com/fabienpiette/folio_fox.git
 cd foliofox
 
 # Copy and configure environment
@@ -128,7 +128,7 @@ sudo ufw allow 9000/tcp  # Portainer (optional)
 
 ```bash
 # Clone repository
-git clone https://github.com/foliofox/foliofox.git
+git clone https://github.com/fabienpiette/folio_fox.git
 cd foliofox
 
 # Copy and configure environment
@@ -174,7 +174,7 @@ docker run -d -p 9000:9000 --name portainer --restart=always \
 
 ```bash
 # Clone repository
-git clone https://github.com/foliofox/foliofox.git
+git clone https://github.com/fabienpiette/folio_fox.git
 cd foliofox
 
 # Configure environment for production
