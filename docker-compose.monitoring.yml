@@ -1,8 +1,6 @@
 # Docker Compose Override for Enhanced Monitoring
 # Use with: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up
 
-version: '3.8'
-
 services:
   # Node Exporter for system metrics
   node-exporter:
@@ -38,7 +36,7 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     ports:
-      - "8080:8080"
+      - "8081:8080"
     networks:
       - foliofox-network
     devices:
@@ -61,7 +59,7 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # PostgreSQL Exporter
+  # PostgreSQL Exporter (Only enabled when using PostgreSQL)
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: foliofox-postgres-exporter
@@ -76,6 +74,8 @@ services:
       - foliofox-network
     security_opt:
       - no-new-privileges:true
+    profiles:
+      - postgres-monitoring
 
   # Nginx Exporter for frontend metrics
   nginx-exporter:

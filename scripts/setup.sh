@@ -438,7 +438,11 @@ start_services() {
             docker compose --profile management up -d
             ;;
         "complete")
-            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+            if [[ "$DATABASE_TYPE" == "postgres" ]]; then
+                docker compose --profile postgres --profile postgres-monitoring -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+            else
+                docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+            fi
             ;;
     esac
     
