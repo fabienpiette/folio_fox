@@ -33,7 +33,10 @@ ARG BUILD_COMMIT=unknown
 ARG BUILD_DATE
 
 # Build the application with optimizations and build info
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+# Set SQLite build tags to fix Alpine Linux compatibility
+ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64
+RUN go build \
+    -tags "sqlite_omit_load_extension" \
     -ldflags="-w -s -X main.version=${BUILD_VERSION} -X main.commit=${BUILD_COMMIT} -X main.date=${BUILD_DATE}" \
     -a -installsuffix cgo \
     -o foliofox \

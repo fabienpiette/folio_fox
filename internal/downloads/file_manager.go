@@ -447,7 +447,8 @@ func (fm *FileManager) addFileToLibrary(ctx context.Context, bookID int64, fileP
 
 	// Calculate file size
 	if info, err := os.Stat(filePath); err == nil {
-		bookFile.FileSizeBytes = &info.Size()
+		size := info.Size()
+		bookFile.FileSizeBytes = &size
 	}
 
 	// Calculate checksum

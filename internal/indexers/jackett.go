@@ -91,7 +91,7 @@ func (c *JackettClient) TestConnection(ctx context.Context) (*models.IndexerTest
 
 	// Get indexer count
 	indexers, _ := c.GetIndexers(ctx)
-	indexerCount := len(indexers)
+	_ = len(indexers) // indexerCount unused but kept for future use
 	configuredCount := 0
 	for _, indexer := range indexers {
 		if indexer.IsConfigured {
@@ -403,6 +403,104 @@ func (c *JackettClient) extractAuthor(title string) *string {
 	}
 	
 	return nil
+}
+
+// extractFormat attempts to extract file format from title or category
+func (c *JackettClient) extractFormat(title, category string) string {
+	title = strings.ToLower(title)
+	
+	formats := []string{"epub", "pdf", "mobi", "azw3", "txt", "djvu", "fb2", "rtf"}
+	for _, format := range formats {
+		if strings.Contains(title, "."+format) || strings.Contains(title, " "+format+" ") {
+			return format
+		}
+	}
+	
+	// Default based on category
+	if strings.Contains(strings.ToLower(category), "ebook") {
+		return "epub"
+	}
+	
+	return "unknown"
+}
+
+// calculateQualityScore calculates a quality score based on various factors
+func (c *JackettClient) calculateQualityScore(seeders *int, size *int64) int {
+	score := 50 // Base score
+	
+	if seeders != nil {
+		// More seeders = higher quality
+		if *seeders > 10 {
+			score += 30
+		} else if *seeders > 5 {
+			score += 20
+		} else if *seeders > 0 {
+			score += 10
+		}
+	}
+	
+	if size != nil {
+		// Reasonable file size for books (1MB - 50MB)
+		sizeMB := *size / (1024 * 1024)
+		if sizeMB >= 1 && sizeMB <= 50 {
+			score += 20
+		} else if sizeMB > 50 && sizeMB <= 100 {
+			score += 10
+		} else if sizeMB > 100 {
+			score -= 10 // Very large files might be low quality
+		}
+	}
+	
+	if score > 100 {
+		score = 100
+	} else if score < 0 {
+		score = 0
+	}
+	
+	return score
+}
+
+// calculateRelevanceScore calculates relevance based on query and title similarity
+func (c *JackettClient) calculateRelevanceScore(query, title string) float64 {
+	query = strings.ToLower(query)
+	title = strings.ToLower(title)
+	
+	// Simple relevance scoring based on word matches
+	queryWords := strings.Fields(query)
+	matchCount := 0
+	
+	for _, word := range queryWords {
+		if strings.Contains(title, word) {
+			matchCount++
+		}
+	}
+	
+	if len(queryWords) == 0 {
+		return 0.0
+	}
+	
+	return float64(matchCount) / float64(len(queryWords))
+}
+
+// formatFileSize formats file size in human readable format
+func (c *JackettClient) formatFileSize(size *int64) string {
+	if size == nil {
+		return "Unknown"
+	}
+	
+	const unit = 1024
+	s := *size
+	if s < unit {
+		return fmt.Sprintf("%d B", s)
+	}
+	
+	div, exp := int64(unit), 0
+	for n := s / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	
+	return fmt.Sprintf("%.1f %cB", float64(s)/float64(div), "KMGTPE"[exp])
 }
 
 // Other helper methods are similar to ProwlarrClient...
