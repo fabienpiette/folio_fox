@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"github.com/foliofox/foliofox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/models"
 )
 
 // WebSocketHub manages WebSocket connections for real-time updates

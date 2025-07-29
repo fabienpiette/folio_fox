@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
-	"github.com/foliofox/foliofox/internal/config"
+	"github.com/fabienpiette/folio_fox/internal/config"
 )
 
 // Client wraps the Redis client with additional functionality

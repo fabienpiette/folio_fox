@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/foliofox/foliofox/internal/repositories"
+	"github.com/fabienpiette/folio_fox/internal/repositories"
 )
 
 // PerformanceMonitor provides comprehensive system performance monitoring

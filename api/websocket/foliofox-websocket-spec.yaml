@@ -25,7 +25,7 @@ info:
     timestamps, and structured payloads for type safety.
   contact:
     name: FolioFox WebSocket Support
-    url: https://github.com/foliofox/foliofox
+    url: https://github.com/fabienpiette/folio_fox
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

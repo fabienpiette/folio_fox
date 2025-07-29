@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/foliofox/foliofox/internal/models"
-	"github.com/foliofox/foliofox/internal/repositories"
-	"github.com/foliofox/foliofox/internal/services"
+	"github.com/fabienpiette/folio_fox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/repositories"
+	"github.com/fabienpiette/folio_fox/internal/services"
 )
 
 // DownloadHandler handles download-related endpoints

@@ -1,4 +1,4 @@
-module github.com/foliofox/foliofox
+module github.com/fabienpiette/folio_fox
 
 go 1.21
 

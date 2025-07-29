@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/foliofox/foliofox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/models"
 )
 
 // JWTClaims represents the JWT claims structure

@@ -7,11 +7,11 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
-	"github.com/foliofox/foliofox/internal/config"
-	"github.com/foliofox/foliofox/internal/downloads"
-	"github.com/foliofox/foliofox/internal/indexers"
-	"github.com/foliofox/foliofox/internal/repositories"
-	"github.com/foliofox/foliofox/internal/search"
+	"github.com/fabienpiette/folio_fox/internal/config"
+	"github.com/fabienpiette/folio_fox/internal/downloads"
+	"github.com/fabienpiette/folio_fox/internal/indexers"
+	"github.com/fabienpiette/folio_fox/internal/repositories"
+	"github.com/fabienpiette/folio_fox/internal/search"
 )
 
 // Container holds all the application services and manages their lifecycle

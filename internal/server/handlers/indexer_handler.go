@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/foliofox/foliofox/internal/services"
+	"github.com/fabienpiette/folio_fox/internal/services"
 )
 
 // IndexerHandler handles indexer management endpoints
