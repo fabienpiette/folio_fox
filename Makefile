@@ -118,8 +118,14 @@ ifdef HAS_COLOR
 define echo_colored
 	@tput $(2); echo "$(1)"; tput sgr0
 endef
+define echo_bold_white
+	@tput bold; tput setaf 7; echo "$(1)"; tput sgr0
+endef
 else
 define echo_colored
+	@echo "$(1)"
+endef
+define echo_bold_white
 	@echo "$(1)"
 endef
 endif
@@ -167,7 +173,7 @@ endif
 
 .PHONY: version
 version: ## Show version information
-	$(call echo_colored,"FolioFox Version Information","bold; tput setaf 7")
+	$(call echo_bold_white,"FolioFox Version Information")
 	@echo "Version:    $(BUILD_VERSION)"
 	@echo "Commit:     $(BUILD_COMMIT)"
 	@echo "Build Date: $(BUILD_DATE)"
@@ -264,10 +270,10 @@ restart: stop run ## Restart all services
 .PHONY: status
 status: ## Show status of all services
 	$(call check_docker)
-	$(call echo_colored,"Service Status:","bold; tput setaf 7")
+	$(call echo_bold_white,"Service Status:")
 	@docker compose $(DOCKER_COMPOSE_FILES) ps
 	@echo ""
-	$(call echo_colored,"Health Checks:","bold; tput setaf 7")
+	$(call echo_bold_white,"Health Checks:")
 ifdef HAS_COLOR
 	@curl -s http://localhost:$(BACKEND_PORT)/api/v1/health 2>/dev/null && (tput setaf 2; echo "✓ Backend healthy"; tput sgr0) || (tput setaf 1; echo "✗ Backend unhealthy"; tput sgr0)
 	@curl -s http://localhost:$(FRONTEND_PORT)/health 2>/dev/null && (tput setaf 2; echo "✓ Frontend healthy"; tput sgr0) || (tput setaf 1; echo "✗ Frontend unhealthy"; tput sgr0)
@@ -604,7 +610,7 @@ check-env: ## Check environment prerequisites
 setup: check-env install create-env db-setup ## Complete project setup for new developers
 	$(call print_success, "Project setup completed successfully!")
 	@echo ""
-	$(call echo_colored,"Next steps:","bold; tput setaf 7")
+	$(call echo_bold_white,"Next steps:")
 	@echo "  1. Review and customize .env file"
 ifdef HAS_COLOR
 	@echo -n "  2. Run '"; tput setaf 6; echo -n "make run"; tput sgr0; echo "' to start the application"
