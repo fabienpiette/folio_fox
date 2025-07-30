@@ -194,6 +194,13 @@ type BookFileRepository interface {
 	SetPrimary(ctx context.Context, fileID int64, bookID int64) error
 }
 
+// IndexerManagerInterface defines the interface for indexer manager operations
+type IndexerManagerInterface interface {
+	Search(ctx context.Context, userID int64, request *models.SearchRequest) (*models.SearchResponse, error)
+	GetHealthyIndexers(ctx context.Context) ([]*models.Indexer, error)
+	TestIndexer(ctx context.Context, indexerID int64) (*models.IndexerTestResult, error)
+}
+
 // SystemRepository defines the interface for system-level operations
 type SystemRepository interface {
 	GetAppSettings(ctx context.Context) (map[string]string, error)

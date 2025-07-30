@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strings"
+	
 	"github.com/spf13/viper"
 )
 
@@ -146,8 +148,11 @@ func Load() (*Config, error) {
 	viper.AddConfigPath("/etc/foliofox")
 
 	// Environment variable settings
-	viper.AutomaticEnv()
 	viper.SetEnvPrefix("FOLIOFOX")
+	viper.AutomaticEnv()
+	
+	// Set key replacer to handle nested keys
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Read configuration file (optional)
 	if err := viper.ReadInConfig(); err != nil {

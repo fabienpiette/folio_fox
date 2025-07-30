@@ -129,8 +129,8 @@ func TestPasswordHasher_VerifyPassword_InvalidHashFormat(t *testing.T) {
 		"$invalid$v=19$m=65536,t=3,p=2$salt$hash",   // Wrong algorithm
 		"$argon2id$v=18$m=65536,t=3,p=2$salt$hash",  // Wrong version
 		"$argon2id$v=19$invalid$salt$hash",          // Invalid parameters
-		"$argon2id$v=19$m=65536,t=3,p=2$invalid$hash", // Invalid salt encoding
-		"$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$invalid", // Invalid hash encoding
+		"$argon2id$v=19$m=65536,t=3,p=2$inv@lid$hash", // Invalid salt encoding
+		"$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$inv@lid", // Invalid hash encoding
 	}
 
 	for _, invalidHash := range invalidHashes {

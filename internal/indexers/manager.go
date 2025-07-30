@@ -369,3 +369,113 @@ func (m *Manager) StartHealthMonitoring(ctx context.Context) {
 func (m *Manager) StopHealthMonitoring() {
 	m.healthMonitor.Stop()
 }
+
+// GetHealthyIndexers returns a list of currently healthy indexers
+func (m *Manager) GetHealthyIndexers(ctx context.Context) ([]*models.Indexer, error) {
+	// Get all active indexers
+	allIndexers, err := m.indexerRepo.List(ctx, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all indexers: %w", err)
+	}
+
+	// Filter for healthy indexers
+	healthyIndexers := make([]*models.Indexer, 0)
+	for _, indexer := range allIndexers {
+		if indexer.Status == nil || *indexer.Status == models.IndexerStatusHealthy {
+			healthyIndexers = append(healthyIndexers, indexer)
+		}
+	}
+
+	return healthyIndexers, nil
+}
+
+// TestIndexer tests the connection to a specific indexer
+func (m *Manager) TestIndexer(ctx context.Context, indexerID int64) (*models.IndexerTestResult, error) {
+	// Get the indexer details
+	indexer, err := m.indexerRepo.GetByID(ctx, indexerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get indexer: %w", err)
+	}
+
+	start := time.Now()
+	var result *models.IndexerTestResult
+
+	// Test based on indexer type
+	switch {
+	case m.prowlarrClient != nil && strings.Contains(strings.ToLower(indexer.Name), "prowlarr"):
+		// Test Prowlarr indexer
+		testResult, err := m.prowlarrClient.TestConnection(ctx)
+		if err != nil {
+			errMsg := err.Error()
+			result = &models.IndexerTestResult{
+				IndexerID:      indexerID,
+				Success:        false,
+				ResponseTimeMS: int(time.Since(start).Milliseconds()),
+				ErrorMessage:   &errMsg,
+			}
+		} else {
+			result = testResult
+			result.IndexerID = indexerID
+		}
+	case m.jackettClient != nil && strings.Contains(strings.ToLower(indexer.Name), "jackett"):
+		// Test Jackett indexer
+		testResult, err := m.jackettClient.TestConnection(ctx)
+		if err != nil {
+			errMsg := err.Error()
+			result = &models.IndexerTestResult{
+				IndexerID:      indexerID,
+				Success:        false,
+				ResponseTimeMS: int(time.Since(start).Milliseconds()),
+				ErrorMessage:   &errMsg,
+			}
+		} else {
+			result = testResult
+			result.IndexerID = indexerID
+		}
+	default:
+		// Test direct indexer
+		if directIndexer, exists := m.directIndexers[strings.ToLower(indexer.Name)]; exists {
+			testResult, err := directIndexer.TestConnection(ctx)
+			if err != nil {
+				errMsg := err.Error()
+				result = &models.IndexerTestResult{
+					IndexerID:      indexerID,
+					Success:        false,
+					ResponseTimeMS: int(time.Since(start).Milliseconds()),
+					ErrorMessage:   &errMsg,
+				}
+			} else {
+				result = testResult
+				result.IndexerID = indexerID
+			}
+		} else {
+			errMsg := fmt.Sprintf("no client available for indexer: %s", indexer.Name)
+			result = &models.IndexerTestResult{
+				IndexerID:      indexerID,
+				Success:        false,
+				ResponseTimeMS: int(time.Since(start).Milliseconds()),
+				ErrorMessage:   &errMsg,
+			}
+		}
+	}
+
+	// Record health check based on test result
+	var status models.IndexerStatus
+	var responseTime *int
+	var errorMsg *string
+
+	if result.Success {
+		status = models.IndexerStatusHealthy
+		responseTime = &result.ResponseTimeMS
+	} else {
+		status = models.IndexerStatusDown
+		errorMsg = result.ErrorMessage
+	}
+
+	m.healthMonitor.RecordHealthCheck(ctx, indexerID, status, responseTime, errorMsg)
+
+	m.logger.Infof("Tested indexer %s (ID: %d): success=%t, response_time=%dms", 
+		indexer.Name, indexerID, result.Success, result.ResponseTimeMS)
+
+	return result, nil
+}

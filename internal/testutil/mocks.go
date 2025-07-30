@@ -9,11 +9,38 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/fabienpiette/folio_fox/internal/models"
+	"github.com/fabienpiette/folio_fox/internal/repositories"
 )
 
 // MockBookFilters is a placeholder for book filters - would be implemented based on actual filters struct
 type MockBookFilters struct {
 	// Add fields as needed based on actual BookFilters implementation
+}
+
+// MockIndexerManager provides mock implementation for IndexerManagerInterface
+type MockIndexerManager struct {
+	mock.Mock
+}
+
+func (m *MockIndexerManager) Search(ctx context.Context, userID int64, request *models.SearchRequest) (*models.SearchResponse, error) {
+	args := m.Called(ctx, userID, request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.SearchResponse), args.Error(1)
+}
+
+func (m *MockIndexerManager) GetHealthyIndexers(ctx context.Context) ([]*models.Indexer, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*models.Indexer), args.Error(1)
+}
+
+func (m *MockIndexerManager) TestIndexer(ctx context.Context, indexerID int64) (*models.IndexerTestResult, error) {
+	args := m.Called(ctx, indexerID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.IndexerTestResult), args.Error(1)
 }
 
 // MockUserRepository provides mock implementation for UserRepository
@@ -82,12 +109,12 @@ func (m *MockBookRepository) Delete(ctx context.Context, id int64) error {
 	return args.Error(0)
 }
 
-func (m *MockBookRepository) List(ctx context.Context, filters interface{}) ([]*models.Book, int, error) {
+func (m *MockBookRepository) List(ctx context.Context, filters *repositories.BookFilters) ([]*models.Book, int, error) {
 	args := m.Called(ctx, filters)
 	return args.Get(0).([]*models.Book), args.Int(1), args.Error(2)
 }
 
-func (m *MockBookRepository) Search(ctx context.Context, query string, filters interface{}) ([]*models.Book, int, error) {
+func (m *MockBookRepository) Search(ctx context.Context, query string, filters *repositories.BookFilters) ([]*models.Book, int, error) {
 	args := m.Called(ctx, query, filters)
 	return args.Get(0).([]*models.Book), args.Int(1), args.Error(2)
 }
@@ -98,6 +125,49 @@ func (m *MockBookRepository) GetWithRelations(ctx context.Context, id int64) (*m
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*models.Book), args.Error(1)
+}
+
+func (m *MockBookRepository) AddAuthor(ctx context.Context, bookID, authorID int64, role string) error {
+	args := m.Called(ctx, bookID, authorID, role)
+	return args.Error(0)
+}
+
+func (m *MockBookRepository) RemoveAuthor(ctx context.Context, bookID, authorID int64) error {
+	args := m.Called(ctx, bookID, authorID)
+	return args.Error(0)
+}
+
+func (m *MockBookRepository) GetByISBN(ctx context.Context, isbn string) (*models.Book, error) {
+	args := m.Called(ctx, isbn)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Book), args.Error(1)
+}
+
+func (m *MockBookRepository) GetAuthors(ctx context.Context, bookID int64) ([]*models.Author, error) {
+	args := m.Called(ctx, bookID)
+	return args.Get(0).([]*models.Author), args.Error(1)
+}
+
+func (m *MockBookRepository) GetGenres(ctx context.Context, bookID int64) ([]*models.Genre, error) {
+	args := m.Called(ctx, bookID)
+	return args.Get(0).([]*models.Genre), args.Error(1)
+}
+
+func (m *MockBookRepository) GetFiles(ctx context.Context, bookID int64) ([]*models.BookFile, error) {
+	args := m.Called(ctx, bookID)
+	return args.Get(0).([]*models.BookFile), args.Error(1)
+}
+
+func (m *MockBookRepository) AddGenre(ctx context.Context, bookID, genreID int64) error {
+	args := m.Called(ctx, bookID, genreID)
+	return args.Error(0)
+}
+
+func (m *MockBookRepository) RemoveGenre(ctx context.Context, bookID, genreID int64) error {
+	args := m.Called(ctx, bookID, genreID)
+	return args.Error(0)
 }
 
 // MockSearchRepository provides mock implementation for SearchRepository
@@ -125,8 +195,18 @@ func (m *MockSearchRepository) GetPopularSearches(ctx context.Context, limit int
 	return args.Get(0).([]interface{}), args.Error(1)
 }
 
-func (m *MockSearchRepository) CacheSearchResults(ctx context.Context, cacheKey string, results *models.SearchResponse, ttl time.Duration) error {
-	args := m.Called(ctx, cacheKey, results, ttl)
+func (m *MockSearchRepository) CreateHistoryEntry(ctx context.Context, entry *models.SearchHistoryEntry) error {
+	args := m.Called(ctx, entry)
+	return args.Error(0)
+}
+
+func (m *MockSearchRepository) DeleteExpiredCache(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockSearchRepository) CacheSearchResults(ctx context.Context, cacheKey string, results *models.SearchResponse, ttlMinutes int) error {
+	args := m.Called(ctx, cacheKey, results, ttlMinutes)
 	return args.Error(0)
 }
 

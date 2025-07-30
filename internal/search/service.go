@@ -9,14 +9,13 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/fabienpiette/folio_fox/internal/indexers"
 	"github.com/fabienpiette/folio_fox/internal/models"
 	"github.com/fabienpiette/folio_fox/internal/repositories"
 )
 
 // Service provides enhanced search functionality with metadata enrichment
 type Service struct {
-	indexerManager *indexers.Manager
+	indexerManager repositories.IndexerManagerInterface
 	bookRepo       repositories.BookRepository
 	searchRepo     repositories.SearchRepository
 	logger         *logrus.Logger
@@ -34,7 +33,7 @@ type MetadataProvider interface {
 
 // NewService creates a new search service
 func NewService(
-	indexerManager *indexers.Manager,
+	indexerManager repositories.IndexerManagerInterface,
 	bookRepo repositories.BookRepository,
 	searchRepo repositories.SearchRepository,
 	logger *logrus.Logger,

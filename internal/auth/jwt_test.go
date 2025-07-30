@@ -190,7 +190,7 @@ func TestJWTManager_RefreshToken_ValidToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait a bit to ensure new token has different issued time
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	// Refresh the token
 	newToken, newExpiry, err := manager.RefreshToken(originalToken)
