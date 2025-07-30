@@ -13,3 +13,7 @@ data/
 foliofox
 coverage.out
 coverage.html
+
+# Python cache
+__pycache__/
+*.pyc
