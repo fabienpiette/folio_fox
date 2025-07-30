@@ -50,7 +50,10 @@ TEST_TIMEOUT := 10m
 COVERAGE_OUT := coverage.out
 COVERAGE_HTML := coverage.html
 
-# Color output
+# Color output (only if terminal supports it and not disabled)
+ifeq ($(NO_COLOR),)
+ifneq ($(TERM),)
+ifneq ($(shell tput colors 2>/dev/null),)
 RED := \033[0;31m
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
@@ -59,6 +62,36 @@ PURPLE := \033[0;35m
 CYAN := \033[0;36m
 WHITE := \033[1;37m
 RESET := \033[0m
+else
+RED := 
+GREEN := 
+YELLOW := 
+BLUE := 
+PURPLE := 
+CYAN := 
+WHITE := 
+RESET := 
+endif
+else
+RED := 
+GREEN := 
+YELLOW := 
+BLUE := 
+PURPLE := 
+CYAN := 
+WHITE := 
+RESET := 
+endif
+else
+RED := 
+GREEN := 
+YELLOW := 
+BLUE := 
+PURPLE := 
+CYAN := 
+WHITE := 
+RESET := 
+endif
 
 # ==================================================================================
 # Helper Functions
@@ -112,6 +145,7 @@ help: ## Show this help message
 	@echo "  $(CYAN)BACKEND_PORT$(RESET)     Backend port (default: 8080)"
 	@echo "  $(CYAN)DATABASE_TYPE$(RESET)    Database type: sqlite/postgres (default: sqlite)"
 	@echo "  $(CYAN)DOCKER_REGISTRY$(RESET)  Docker registry (default: ghcr.io/fabienpiette/folio_fox)"
+	@echo "  $(CYAN)NO_COLOR$(RESET)         Set to disable color output (for terminals without color support)"
 	@echo ""
 
 .PHONY: version
