@@ -14,7 +14,7 @@ import { formatFileSize, formatRelativeTime } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import { LoadingSpinner } from '@/components/ui/feedback/LoadingSpinner'
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
-import { useVirtualizer } from '@tanstack/react-virtual'
+// import { useVirtualizer } from '@tanstack/react-virtual'
 
 interface OptimizedSearchResultsProps {
   results: SearchResult[]
@@ -449,7 +449,7 @@ export const OptimizedSearchResults = memo<OptimizedSearchResultsProps>(({
   onDownload,
   onPreview,
   viewMode = 'list',
-  pageSize = 50,
+  pageSize: _pageSize = 50,
   hasNextPage,
   fetchNextPage,
   isFetchingNextPage,

@@ -468,11 +468,10 @@ db-setup: ## Initialize database with migrations
 	$(call print_success, "Database setup completed")
 
 .PHONY: db-migrate
-db-migrate: ## Run database migrations
-	$(call print_status, "Running database migrations...")
-	@mkdir -p $(dir $(DATABASE_PATH))
-	@python3 $(DATABASE_DIR)/migrations/migration_manager.py --db-path $(DATABASE_PATH) --migrations-dir $(DATABASE_DIR)/migrations --action migrate
-	$(call print_success, "Database migrations completed")
+db-migrate: ## Run database migrations (handled automatically by Go backend)
+	$(call print_status, "Database migrations are handled automatically by the Go backend")
+	$(call print_info, "Migrations run automatically when the backend starts")
+	$(call print_success, "No manual migration needed with Go backend")
 
 .PHONY: db-reset
 db-reset: ## Reset database to clean state

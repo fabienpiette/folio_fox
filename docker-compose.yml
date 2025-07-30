@@ -50,14 +50,14 @@ services:
     image: redis:7-alpine
     container_name: foliofox-redis
     restart: unless-stopped
-    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
       - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     ports:
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -105,10 +105,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-foliofox}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       
-      # Redis Configuration
-      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
-      REDIS_DB: ${REDIS_DB:-0}
+      # Redis Configuration  
+      FOLIOFOX_REDIS_HOST: ${FOLIOFOX_REDIS_HOST:-redis}
+      FOLIOFOX_REDIS_PORT: ${FOLIOFOX_REDIS_PORT:-6379}
+      FOLIOFOX_REDIS_PASSWORD: ${FOLIOFOX_REDIS_PASSWORD:-}
+      FOLIOFOX_REDIS_DB: ${FOLIOFOX_REDIS_DB:-0}
       
       # Server Configuration
       SERVER_PORT: ${SERVER_PORT:-8080}
@@ -147,7 +148,7 @@ services:
     depends_on:
       - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -1,0 +1,45 @@
+# Exclude data directories (Docker volumes)
+data/
+*.db
+
+# Exclude build artifacts
+foliofox
+coverage.out
+coverage.html
+
+# Exclude Python cache
+__pycache__/
+*.pyc
+
+# Exclude Git and IDE files
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Exclude documentation and scripts not needed in container
+README.md
+docs/
+scripts/
+*.md
+
+# Exclude test files
+*_test.go
+test/
+tests/
+
+# Exclude development configuration
+.env
+.env.local
+.env.*.local
+
+# Exclude frontend node_modules (will be installed in container)
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
+
+# Exclude temporary files
+tmp/
+temp/
+*.tmp
+*.log

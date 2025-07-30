@@ -37,8 +37,8 @@ ENV NODE_ENV=production \
     VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 # Build the application with optimizations
+# Note: Skipping tests during Docker build - run tests separately with make test
 RUN npm run build && \
-    npm run test:run && \
     npm prune --production
 
 # Stage 2: Production stage with Nginx
