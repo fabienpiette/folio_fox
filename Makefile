@@ -145,7 +145,7 @@ deps-go: ## Install/update Go dependencies
 deps-frontend: ## Install/update frontend dependencies
 	$(call check_command,npm)
 	$(call print_status, "Installing frontend dependencies...")
-	@cd $(FRONTEND_DIR) && npm ci --silent
+	@cd $(FRONTEND_DIR) && (npm ci --silent 2>/dev/null || npm install --silent)
 	$(call print_success, "Frontend dependencies installed")
 
 .PHONY: install
@@ -155,12 +155,12 @@ install: deps install-tools ## Install development tools and dependencies
 .PHONY: install-tools
 install-tools: ## Install development tools
 	$(call print_status, "Installing development tools...")
-	@go install honnef.co/go/tools/cmd/staticcheck@latest
-	@go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@go install github.com/swaggo/swag/cmd/swag@latest
-	@cd $(FRONTEND_DIR) && npx playwright install --with-deps
-	$(call print_success, "Development tools installed")
+	@go install honnef.co/go/tools/cmd/staticcheck@latest || echo "Warning: Failed to install staticcheck"
+	@go install github.com/securego/gosec/v2/cmd/gosec@latest || echo "Warning: Failed to install gosec"
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest || echo "Warning: Failed to install golangci-lint"
+	@go install github.com/swaggo/swag/cmd/swag@latest || echo "Warning: Failed to install swag"
+	@cd $(FRONTEND_DIR) && npx playwright install || echo "Warning: Failed to install Playwright browsers"
+	$(call print_success, Development tools installation attempted)
 
 # ==================================================================================
 # Application Management
