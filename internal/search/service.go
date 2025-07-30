@@ -135,6 +135,11 @@ func (s *Service) GetSuggestions(ctx context.Context, userID int64, partialQuery
 		suggestions = suggestions[:limit]
 	}
 	
+	// Ensure we always return a non-nil slice
+	if suggestions == nil {
+		suggestions = []*SearchSuggestion{}
+	}
+	
 	return suggestions, nil
 }
 
@@ -537,7 +542,7 @@ func (s *Service) extractYear(title string) int {
 	words := strings.Fields(title)
 	for _, word := range words {
 		if len(word) == 4 {
-			if year := s.parseYear(word); year > 1800 && year <= time.Now().Year() {
+			if year := s.parseYear(word); year >= 1800 && year <= time.Now().Year() {
 				return year
 			}
 		}
