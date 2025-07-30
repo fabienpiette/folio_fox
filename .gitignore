@@ -3,3 +3,13 @@
 .env
 .env.local
 .env.*.local
+IDEAS.md
+
+# Data directories (Docker volumes)
+data/
+*.db
+
+# Build artifacts
+foliofox
+coverage.out
+coverage.html

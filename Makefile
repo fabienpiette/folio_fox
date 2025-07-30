@@ -45,52 +45,28 @@ BACKEND_PORT ?= 8080
 REDIS_PORT ?= 6379
 POSTGRES_PORT ?= 5432
 
+# Database configuration (use a writable path for local development)
+DATABASE_PATH ?= $(PROJECT_ROOT)/foliofox.db
+
 # Test configuration
 TEST_TIMEOUT := 10m
 COVERAGE_OUT := coverage.out
 COVERAGE_HTML := coverage.html
 
-# Color output (only if terminal supports it and not disabled)
+# Color support using tput (more reliable than ANSI codes)
 ifeq ($(NO_COLOR),)
 ifneq ($(TERM),)
 ifneq ($(shell tput colors 2>/dev/null),)
-RED := \033[0;31m
-GREEN := \033[0;32m
-YELLOW := \033[1;33m
-BLUE := \033[0;34m
-PURPLE := \033[0;35m
-CYAN := \033[0;36m
-WHITE := \033[1;37m
-RESET := \033[0m
+# Use tput for colors - more compatible across terminals
+HAS_COLOR := 1
 else
-RED := 
-GREEN := 
-YELLOW := 
-BLUE := 
-PURPLE := 
-CYAN := 
-WHITE := 
-RESET := 
+HAS_COLOR := 
 endif
 else
-RED := 
-GREEN := 
-YELLOW := 
-BLUE := 
-PURPLE := 
-CYAN := 
-WHITE := 
-RESET := 
+HAS_COLOR := 
 endif
 else
-RED := 
-GREEN := 
-YELLOW := 
-BLUE := 
-PURPLE := 
-CYAN := 
-WHITE := 
-RESET := 
+HAS_COLOR := 
 endif
 
 # ==================================================================================
@@ -99,33 +75,58 @@ endif
 
 # Check if command exists
 define check_command
-	@which $(1) > /dev/null || (echo "$(RED)Error: $(1) is not installed$(RESET)" && exit 1)
+	@which $(1) > /dev/null || ($(call print_error, "$(1) is not installed"); exit 1)
 endef
 
-# Print colored status messages
+# Print colored status messages using tput
+ifdef HAS_COLOR
 define print_status
-	@echo "$(BLUE)➤$(RESET) $(1)"
+	@tput setaf 4; echo "➤ $(1)"; tput sgr0
 endef
-
 define print_success
-	@echo "$(GREEN)✓$(RESET) $(1)"
+	@tput setaf 2; echo "✓ $(1)"; tput sgr0
 endef
-
 define print_warning
-	@echo "$(YELLOW)⚠$(RESET) $(1)"
+	@tput setaf 3; echo "⚠ $(1)"; tput sgr0
 endef
-
 define print_error
-	@echo "$(RED)✗$(RESET) $(1)"
+	@tput setaf 1; echo "✗ $(1)"; tput sgr0
 endef
-
 define print_info
-	@echo "$(CYAN)ℹ$(RESET) $(1)"
+	@tput setaf 6; echo "ℹ $(1)"; tput sgr0
 endef
+else
+define print_status
+	@echo "➤ $(1)"
+endef
+define print_success
+	@echo "✓ $(1)"
+endef
+define print_warning
+	@echo "⚠ $(1)"
+endef
+define print_error
+	@echo "✗ $(1)"
+endef
+define print_info
+	@echo "ℹ $(1)"
+endef
+endif
+
+# Helper function for colored echo
+ifdef HAS_COLOR
+define echo_colored
+	@tput $(2); echo "$(1)"; tput sgr0
+endef
+else
+define echo_colored
+	@echo "$(1)"
+endef
+endif
 
 # Check if Docker is running
 define check_docker
-	@docker info > /dev/null 2>&1 || (echo "$(RED)Error: Docker is not running$(RESET)" && exit 1)
+	@docker info > /dev/null 2>&1 || ($(call print_error, "Docker is not running"); exit 1)
 endef
 
 # ==================================================================================
@@ -134,23 +135,39 @@ endef
 
 .PHONY: help
 help: ## Show this help message
-	@echo "$(WHITE)FolioFox Development Makefile$(RESET)"
-	@echo "$(CYAN)Version: $(BUILD_VERSION) | Commit: $(BUILD_COMMIT)$(RESET)"
+ifdef HAS_COLOR
+	@tput bold; tput setaf 7; echo "FolioFox Development Makefile"; tput sgr0
+	@tput setaf 6; echo "Version: $(BUILD_VERSION) | Commit: $(BUILD_COMMIT)"; tput sgr0
 	@echo ""
-	@echo "$(WHITE)Available targets:$(RESET)"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@tput bold; tput setaf 7; echo "Available targets:"; tput sgr0
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ""
-	@echo "$(WHITE)Environment Variables:$(RESET)"
-	@echo "  $(CYAN)FRONTEND_PORT$(RESET)    Frontend port (default: 3000)"
-	@echo "  $(CYAN)BACKEND_PORT$(RESET)     Backend port (default: 8080)"
-	@echo "  $(CYAN)DATABASE_TYPE$(RESET)    Database type: sqlite/postgres (default: sqlite)"
-	@echo "  $(CYAN)DOCKER_REGISTRY$(RESET)  Docker registry (default: ghcr.io/fabienpiette/folio_fox)"
-	@echo "  $(CYAN)NO_COLOR$(RESET)         Set to disable color output (for terminals without color support)"
+	@tput bold; tput setaf 7; echo "Environment Variables:"; tput sgr0
+	@tput setaf 6; echo -n "  FRONTEND_PORT"; tput sgr0; echo "    Frontend port (default: 3000)"
+	@tput setaf 6; echo -n "  BACKEND_PORT"; tput sgr0; echo "     Backend port (default: 8080)"
+	@tput setaf 6; echo -n "  DATABASE_TYPE"; tput sgr0; echo "    Database type: sqlite/postgres (default: sqlite)"
+	@tput setaf 6; echo -n "  DOCKER_REGISTRY"; tput sgr0; echo "  Docker registry (default: ghcr.io/fabienpiette/folio_fox)"
+	@tput setaf 6; echo -n "  NO_COLOR"; tput sgr0; echo "         Set to disable color output (for terminals without color support)"
 	@echo ""
+else
+	@echo "FolioFox Development Makefile"
+	@echo "Version: $(BUILD_VERSION) | Commit: $(BUILD_COMMIT)"
+	@echo ""
+	@echo "Available targets:"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "Environment Variables:"
+	@echo "  FRONTEND_PORT    Frontend port (default: 3000)"
+	@echo "  BACKEND_PORT     Backend port (default: 8080)"
+	@echo "  DATABASE_TYPE    Database type: sqlite/postgres (default: sqlite)"
+	@echo "  DOCKER_REGISTRY  Docker registry (default: ghcr.io/fabienpiette/folio_fox)"
+	@echo "  NO_COLOR         Set to disable color output (for terminals without color support)"
+	@echo ""
+endif
 
 .PHONY: version
 version: ## Show version information
-	@echo "$(WHITE)FolioFox Version Information$(RESET)"
+	$(call echo_colored,"FolioFox Version Information","bold; tput setaf 7")
 	@echo "Version:    $(BUILD_VERSION)"
 	@echo "Commit:     $(BUILD_COMMIT)"
 	@echo "Build Date: $(BUILD_DATE)"
@@ -171,7 +188,6 @@ deps-go: ## Install/update Go dependencies
 	$(call check_command,go)
 	$(call print_status, "Installing Go dependencies...")
 	@go mod download
-	@go mod tidy
 	@go mod verify
 	$(call print_success, "Go dependencies installed")
 
@@ -248,12 +264,17 @@ restart: stop run ## Restart all services
 .PHONY: status
 status: ## Show status of all services
 	$(call check_docker)
-	@echo "$(WHITE)Service Status:$(RESET)"
+	$(call echo_colored,"Service Status:","bold; tput setaf 7")
 	@docker compose $(DOCKER_COMPOSE_FILES) ps
 	@echo ""
-	@echo "$(WHITE)Health Checks:$(RESET)"
-	@curl -s http://localhost:$(BACKEND_PORT)/api/v1/health 2>/dev/null && echo "$(GREEN)✓$(RESET) Backend healthy" || echo "$(RED)✗$(RESET) Backend unhealthy"
-	@curl -s http://localhost:$(FRONTEND_PORT)/health 2>/dev/null && echo "$(GREEN)✓$(RESET) Frontend healthy" || echo "$(RED)✗$(RESET) Frontend unhealthy"
+	$(call echo_colored,"Health Checks:","bold; tput setaf 7")
+ifdef HAS_COLOR
+	@curl -s http://localhost:$(BACKEND_PORT)/api/v1/health 2>/dev/null && (tput setaf 2; echo "✓ Backend healthy"; tput sgr0) || (tput setaf 1; echo "✗ Backend unhealthy"; tput sgr0)
+	@curl -s http://localhost:$(FRONTEND_PORT)/health 2>/dev/null && (tput setaf 2; echo "✓ Frontend healthy"; tput sgr0) || (tput setaf 1; echo "✗ Frontend unhealthy"; tput sgr0)
+else
+	@curl -s http://localhost:$(BACKEND_PORT)/api/v1/health 2>/dev/null && echo "✓ Backend healthy" || echo "✗ Backend unhealthy"
+	@curl -s http://localhost:$(FRONTEND_PORT)/health 2>/dev/null && echo "✓ Frontend healthy" || echo "✗ Frontend unhealthy"
+endif
 
 # ==================================================================================
 # Build System
@@ -443,7 +464,8 @@ db-setup: ## Initialize database with migrations
 .PHONY: db-migrate
 db-migrate: ## Run database migrations
 	$(call print_status, "Running database migrations...")
-	@python3 $(DATABASE_DIR)/migrations/migration_manager.py migrate
+	@mkdir -p $(dir $(DATABASE_PATH))
+	@python3 $(DATABASE_DIR)/migrations/migration_manager.py --db-path $(DATABASE_PATH) --migrations-dir $(DATABASE_DIR)/migrations --action migrate
 	$(call print_success, "Database migrations completed")
 
 .PHONY: db-reset
@@ -582,9 +604,13 @@ check-env: ## Check environment prerequisites
 setup: check-env install create-env db-setup ## Complete project setup for new developers
 	$(call print_success, "Project setup completed successfully!")
 	@echo ""
-	@echo "$(WHITE)Next steps:$(RESET)"
+	$(call echo_colored,"Next steps:","bold; tput setaf 7")
 	@echo "  1. Review and customize .env file"
-	@echo "  2. Run '$(CYAN)make run$(RESET)' to start the application"
+ifdef HAS_COLOR
+	@echo -n "  2. Run '"; tput setaf 6; echo -n "make run"; tput sgr0; echo "' to start the application"
+else
+	@echo "  2. Run 'make run' to start the application"
+endif
 	@echo "  3. Visit http://localhost:$(FRONTEND_PORT) to access the frontend"
 	@echo "  4. Visit http://localhost:$(BACKEND_PORT)/api/v1/health to check backend"
 
@@ -595,7 +621,7 @@ create-env: ## Create .env file from template
 		./$(SCRIPTS_DIR)/setup.sh --unattended --skip-pull --skip-start; \
 		$(call print_success, ".env file created"); \
 	else \
-		$(call print_info, ".env file already exists"); \
+		echo "ℹ .env file already exists"; \
 	fi
 
 .PHONY: backup

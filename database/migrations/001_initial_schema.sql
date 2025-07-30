@@ -18,9 +18,7 @@ PRAGMA foreign_keys = ON;
 -- Verify schema creation
 SELECT 'Schema creation completed successfully' as status;
 
--- Update schema version
-INSERT INTO schema_versions (version, description) VALUES
-(1, 'Initial schema creation - all core tables and indexes created');
+-- Schema version will be updated automatically by migration manager
 
 COMMIT;
 
