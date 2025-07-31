@@ -386,9 +386,6 @@ func int64Ptr(i int64) *int64 {
 	return &i
 }
 
-func intPtr(i int) *int {
-	return &i
-}
 
 // Benchmark tests
 func BenchmarkDownloadQueueItem_JSONMarshal(b *testing.B) {
@@ -417,7 +414,7 @@ func BenchmarkDownloadQueueItem_JSONMarshal(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(item)
+		_, _ = json.Marshal(item)
 	}
 }
 
@@ -449,7 +446,7 @@ func BenchmarkDownloadStats_JSONMarshal(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(stats)
+		_, _ = json.Marshal(stats)
 	}
 }
 

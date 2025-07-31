@@ -31,7 +31,7 @@ export const searchApi = {
       queryParams.append('use_cache', params.use_cache.toString())
     }
 
-    return apiClient.get<SearchResponse>(`/search?${queryParams.toString()}`)
+    return await apiClient.get<SearchResponse>(`/search?${queryParams.toString()}`)
   },
 
   // Get search suggestions for autocomplete
@@ -65,7 +65,7 @@ export const searchApi = {
       days: days.toString(),
     })
 
-    return apiClient.get(`/search/history?${queryParams.toString()}`)
+    return await apiClient.get(`/search/history?${queryParams.toString()}`)
   },
 
   // Clear search history

@@ -439,7 +439,9 @@ func (dm *Manager) reportProgress(worker *DownloadWorker) {
 			}
 			
 			// Update database
-			dm.downloadRepo.UpdateProgress(context.Background(), worker.item.ID, progress.ProgressPercentage, progress.BytesDownloaded)
+			if err := dm.downloadRepo.UpdateProgress(context.Background(), worker.item.ID, progress.ProgressPercentage, progress.BytesDownloaded); err != nil {
+				dm.logger.Warnf("Failed to update download progress: %v", err)
+			}
 			
 			// Call registered callbacks
 			dm.progressMu.RLock()
@@ -476,13 +478,17 @@ func (dm *Manager) handleDownloadError(ctx context.Context, item *models.Downloa
 			time.Sleep(dm.retryDelay)
 			item.RetryCount++
 			item.Status = models.DownloadStatusPending
-			dm.downloadRepo.UpdateQueueItem(context.Background(), item)
+			if err := dm.downloadRepo.UpdateQueueItem(context.Background(), item); err != nil {
+				dm.logger.Warnf("Failed to update queue item for retry: %v", err)
+			}
 		}()
 		
 		dm.logger.Infof("Scheduling retry %d/%d for download %d", item.RetryCount+1, item.MaxRetries, item.ID)
 	} else {
 		// Mark as failed
-		dm.downloadRepo.SetStatus(ctx, item.ID, models.DownloadStatusFailed, &errorMsg)
+		if err := dm.downloadRepo.SetStatus(ctx, item.ID, models.DownloadStatusFailed, &errorMsg); err != nil {
+			dm.logger.Warnf("Failed to set download status to failed: %v", err)
+		}
 		
 		// Create history entry
 		dm.createHistoryEntry(ctx, item, models.DownloadStatusFailed, &errorMsg)
@@ -502,14 +508,20 @@ func (dm *Manager) handleDownloadSuccess(ctx context.Context, item *models.Downl
 	}
 	
 	// Mark as completed
-	dm.downloadRepo.CompleteDownload(ctx, item.ID, *item.DownloadPath)
+	if err := dm.downloadRepo.CompleteDownload(ctx, item.ID, *item.DownloadPath); err != nil {
+		dm.logger.Warnf("Failed to mark download as completed: %v", err)
+	}
 	
 	// Create history entry
 	dm.createHistoryEntry(ctx, item, models.DownloadStatusCompleted, nil)
 	
 	// File organization (if enabled)
 	if dm.fileManager != nil {
-		go dm.fileManager.OrganizeDownload(ctx, item)
+		go func() {
+			if err := dm.fileManager.OrganizeDownload(ctx, item); err != nil {
+				dm.logger.Warnf("Failed to organize download: %v", err)
+			}
+		}()
 	}
 }
 

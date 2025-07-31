@@ -8,8 +8,7 @@ import {
   SearchResult, 
   DownloadQueueItem, 
   Indexer,
-  SystemHealth,
-  DownloadStatus
+  SystemHealth
 } from '@/types'
 
 let userIdCounter = 1

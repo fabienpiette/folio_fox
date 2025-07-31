@@ -527,7 +527,7 @@ func BenchmarkSearchResult_JSONMarshal(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(result)
+		_, _ = json.Marshal(result) // Benchmark ignores return values
 	}
 }
 
@@ -560,7 +560,7 @@ func BenchmarkSearchResponse_JSONMarshal(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(response)
+		_, _ = json.Marshal(response) // Benchmark ignores return values
 	}
 }
 

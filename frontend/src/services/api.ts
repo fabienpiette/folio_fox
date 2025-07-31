@@ -31,12 +31,18 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    const { response } = error
+    const { response, config } = error
 
     if (response?.status === 401) {
-      // Token expired or invalid
-      useAuthStore.getState().logout()
-      toast.error('Session expired. Please log in again.')
+      // Only auto-logout on critical auth failures, not on optional API calls
+      const isOptionalCall = config?.url?.includes('/search/history') || 
+                           config?.url?.includes('/search/suggestions')
+      
+      if (!isOptionalCall) {
+        // Token expired or invalid on a critical endpoint
+        useAuthStore.getState().logout()
+        toast.error('Session expired. Please log in again.')
+      }
       return Promise.reject(error)
     }
 

@@ -102,7 +102,7 @@ describe('API Integration Tests', () => {
       const token = 'test-auth-token'
       localStorage.setItem('foliofox_token', token)
 
-      let capturedHeaders: Record<string, string> = {}
+      const capturedHeaders: Record<string, string> = {}
 
       server.use(
         http.get('/api/v1/downloads/queue', ({ request }) => {

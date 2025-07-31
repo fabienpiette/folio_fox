@@ -205,7 +205,11 @@ func TestRunMigrations_NoMigrationsDir(t *testing.T) {
 	// Change to temporary directory where migrations don't exist
 	originalDir, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Failed to restore directory: %v", err)
+		}
+	}()
 
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -242,7 +246,11 @@ func TestRunMigrations_WithMigrationsDir(t *testing.T) {
 	// Change to temp directory so migrations can be found
 	originalDir, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Failed to restore directory: %v", err)
+		}
+	}()
 
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -420,7 +428,11 @@ func TestDB_EdgeCases(t *testing.T) {
 		tempDir := t.TempDir()
 		originalDir, err := os.Getwd()
 		require.NoError(t, err)
-		defer os.Chdir(originalDir)
+		defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Failed to restore directory: %v", err)
+		}
+	}()
 
 		err = os.Chdir(tempDir)
 		require.NoError(t, err)

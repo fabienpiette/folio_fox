@@ -405,7 +405,7 @@ func BenchmarkStringList_Scan(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var sl StringList
-		sl.Scan(input)
+		_ = sl.Scan(input)
 	}
 }
 
@@ -414,7 +414,7 @@ func BenchmarkStringList_Value(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sl.Value()
+		_, _ = sl.Value()
 	}
 }
 
@@ -441,7 +441,7 @@ func BenchmarkBook_JSONMarshal(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(book)
+		_, _ = json.Marshal(book)
 	}
 }
 
@@ -463,7 +463,7 @@ func BenchmarkBook_JSONUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var book Book
-		json.Unmarshal(jsonData, &book)
+		_ = json.Unmarshal(jsonData, &book)
 	}
 }
 

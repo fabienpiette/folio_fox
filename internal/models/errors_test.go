@@ -251,7 +251,7 @@ func TestAPIError_ImplementsErrorInterface(t *testing.T) {
 func BenchmarkNewAPIError(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		NewAPIError(400, "Bad Request", "Invalid input provided", "/api/v1/books")
+		_ = NewAPIError(400, "Bad Request", "Invalid input provided", "/api/v1/books")
 	}
 }
 
@@ -273,7 +273,7 @@ func BenchmarkAPIError_JSONMarshal(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(apiError)
+		_, _ = json.Marshal(apiError) // Benchmark ignores return values
 	}
 }
 

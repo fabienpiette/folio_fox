@@ -285,6 +285,9 @@ func (qo *QueryOptimizer) expandSynonyms(query string) string {
 	words := strings.Fields(query)
 	expanded := make([]string, 0, len(words)*2)
 
+	qo.mu.RLock()
+	defer qo.mu.RUnlock()
+
 	for _, word := range words {
 		expanded = append(expanded, word)
 		if synonyms, exists := qo.synonyms[word]; exists {
@@ -302,6 +305,9 @@ func (qo *QueryOptimizer) expandSynonyms(query string) string {
 func (qo *QueryOptimizer) removeStopWords(query string) string {
 	words := strings.Fields(query)
 	filtered := make([]string, 0, len(words))
+
+	qo.mu.RLock()
+	defer qo.mu.RUnlock()
 
 	for _, word := range words {
 		if !qo.stopWords[word] {

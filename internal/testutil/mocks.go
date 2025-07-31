@@ -354,7 +354,8 @@ func (m *MockHTTPServer) handler(w http.ResponseWriter, r *http.Request) {
 	body := ""
 	if r.Body != nil {
 		bodyBytes := make([]byte, r.ContentLength)
-		r.Body.Read(bodyBytes)
+		n, _ := r.Body.Read(bodyBytes) // Read what we can for test mocking
+		bodyBytes = bodyBytes[:n]
 		body = string(bodyBytes)
 	}
 
@@ -387,24 +388,24 @@ func (m *MockHTTPServer) handler(w http.ResponseWriter, r *http.Request) {
 		// Mock Prowlarr indexer list
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"Test Indexer","protocol":"torrent","privacy":"public"}]`))
+		_, _ = w.Write([]byte(`[{"id":1,"name":"Test Indexer","protocol":"torrent","privacy":"public"}]`)) // Mock response
 	
 	case "/api/v1/search":
 		// Mock Prowlarr search
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"guid":"test-guid","title":"Test Book","link":"http://example.com/test.torrent","pubDate":"2023-01-01T00:00:00Z"}]`))
+		_, _ = w.Write([]byte(`[{"guid":"test-guid","title":"Test Book","link":"http://example.com/test.torrent","pubDate":"2023-01-01T00:00:00Z"}]`)) // Mock response
 	
 	case "/api/v2.0/indexers/all/results":
 		// Mock Jackett search
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Results":[{"Title":"Test Book","Link":"http://example.com/test.torrent","PublishDate":"2023-01-01T00:00:00Z"}]}`))
+		_, _ = w.Write([]byte(`{"Results":[{"Title":"Test Book","Link":"http://example.com/test.torrent","PublishDate":"2023-01-01T00:00:00Z"}]}`)) // Mock response
 	
 	default:
 		// Default 404 response
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"Not found"}`))
+		_, _ = w.Write([]byte(`{"error":"Not found"}`)) // Mock error response
 	}
 }
 
@@ -420,7 +421,7 @@ func ProwlarrMockServer() *MockHTTPServer {
 			{"id":1,"name":"Test Indexer 1","protocol":"torrent","privacy":"public","supportsRss":true},
 			{"id":2,"name":"Test Indexer 2","protocol":"usenet","privacy":"private","supportsRss":true}
 		]`
-		w.Write([]byte(indexers))
+		_, _ = w.Write([]byte(indexers)) // Mock indexers response
 	})
 
 	server.SetResponse("/api/v1/search", func(w http.ResponseWriter, r *http.Request) {
@@ -444,7 +445,7 @@ func ProwlarrMockServer() *MockHTTPServer {
 				"indexer":"Test Indexer 2"
 			}
 		]`
-		w.Write([]byte(results))
+		_, _ = w.Write([]byte(results)) // Mock search results response
 	})
 
 	return server
@@ -462,7 +463,7 @@ func JackettMockServer() *MockHTTPServer {
 			{"id":"testindexer1","name":"Test Indexer 1","type":"public"},
 			{"id":"testindexer2","name":"Test Indexer 2","type":"private"}
 		]`
-		w.Write([]byte(indexers))
+		_, _ = w.Write([]byte(indexers)) // Mock Jackett indexers response
 	})
 
 	server.SetResponse("/api/v2.0/indexers/all/results", func(w http.ResponseWriter, r *http.Request) {
@@ -486,7 +487,7 @@ func JackettMockServer() *MockHTTPServer {
 				}
 			]
 		}`
-		w.Write([]byte(results))
+		_, _ = w.Write([]byte(results)) // Mock Jackett search results response
 	})
 
 	return server

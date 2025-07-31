@@ -222,6 +222,7 @@ type AlertThresholds struct {
 type AlertManager struct {
 	thresholds    *AlertThresholds
 	alertHandlers []AlertHandler
+	logger        *logrus.Logger
 	mu            sync.RWMutex
 }
 
@@ -283,7 +284,7 @@ func NewPerformanceMonitor(
 		dbMetrics:      &DatabaseMetrics{},
 		networkMetrics: &NetworkMetrics{},
 		stopChan:       make(chan struct{}),
-		alertManager:   NewAlertManager(config.AlertThresholds),
+		alertManager:   NewAlertManager(config.AlertThresholds, logger),
 		maxHistory:     8640, // 24 hours at 10-second intervals
 	}
 }
@@ -623,10 +624,11 @@ func (pm *PerformanceMonitor) getDatabaseCacheMetrics() CacheMetrics  { return C
 func (pm *PerformanceMonitor) getTransactionMetrics() TxMetrics       { return TxMetrics{} }
 
 // NewAlertManager creates a new alert manager
-func NewAlertManager(thresholds *AlertThresholds) *AlertManager {
+func NewAlertManager(thresholds *AlertThresholds, logger *logrus.Logger) *AlertManager {
 	return &AlertManager{
 		thresholds:    thresholds,
 		alertHandlers: make([]AlertHandler, 0),
+		logger:        logger,
 	}
 }
 
@@ -640,7 +642,7 @@ func (am *AlertManager) TriggerAlert(alert *PerformanceAlert) {
 	for _, handler := range handlers {
 		go func(h AlertHandler) {
 			if err := h.HandleAlert(alert); err != nil {
-				// Log error handling failure
+				am.logger.Warnf("Alert handler failed: %v", err)
 			}
 		}(handler)
 	}

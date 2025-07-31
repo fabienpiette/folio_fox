@@ -86,7 +86,7 @@ func (c *JackettClient) TestConnection(ctx context.Context) (*models.IndexerTest
 	
 	body, err := io.ReadAll(resp.Body)
 	if err == nil {
-		json.Unmarshal(body, &configResp)
+		_ = json.Unmarshal(body, &configResp) // Ignore unmarshal errors for test connection
 	}
 
 	// Get indexer count

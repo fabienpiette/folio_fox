@@ -49,7 +49,7 @@ export const searchHandlers = [
   http.get('/api/v1/search', ({ request }) => {
     const url = new URL(request.url)
     const query = url.searchParams.get('query')
-    const timeout = parseInt(url.searchParams.get('timeout') || '10000')
+    const _timeout = parseInt(url.searchParams.get('timeout') || '10000') // For future use
     const limit = parseInt(url.searchParams.get('limit') || '50')
     
     // Simulate search timeout
@@ -154,7 +154,7 @@ export const searchHandlers = [
   http.get('/api/v1/search/history', ({ request }) => {
     const url = new URL(request.url)
     const limit = parseInt(url.searchParams.get('limit') || '20')
-    const days = parseInt(url.searchParams.get('days') || '30')
+    const _days = parseInt(url.searchParams.get('days') || '30') // For future filtering
     
     const history = [
       {

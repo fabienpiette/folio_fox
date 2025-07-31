@@ -451,7 +451,7 @@ func BenchmarkUser_JSONMarshal(b *testing.B) {
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(user)
+		_, _ = json.Marshal(user) // Benchmark ignores return values
 	}
 }
 
@@ -470,7 +470,7 @@ func BenchmarkUser_JSONUnmarshal(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var user User
-		json.Unmarshal(jsonData, &user)
+		_ = json.Unmarshal(jsonData, &user)
 	}
 }
 

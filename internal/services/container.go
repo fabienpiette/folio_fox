@@ -226,10 +226,10 @@ func (c *Container) GetConfig() *config.Config {
 
 // initializeRepositories creates all repository instances
 func (c *Container) initializeRepositories() {
-	// Note: In a real implementation, these would be actual repository implementations
-	// For now, they're placeholders that would need to be implemented
+	// Initialize repositories
+	c.userRepo = repositories.NewUserRepository(c.db)
 	
-	// c.userRepo = repositories.NewUserRepository(c.db)
+	// TODO: Implement other repositories when needed
 	// c.bookRepo = repositories.NewBookRepository(c.db)
 	// c.downloadRepo = repositories.NewDownloadRepository(c.db)
 	// c.indexerRepo = repositories.NewIndexerRepository(c.db)

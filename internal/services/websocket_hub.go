@@ -399,10 +399,10 @@ func (c *Client) readPump() {
 	}()
 	
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait)) // Ignore deadline errors
 	c.conn.SetPongHandler(func(string) error {
 		c.lastPing = time.Now()
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait)) // Ignore deadline errors
 		return nil
 	})
 	
@@ -431,9 +431,9 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait)) // Ignore deadline errors
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{}) // Ignore close message errors
 				return
 			}
 			
@@ -441,13 +441,13 @@ func (c *Client) writePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			_, _ = w.Write(message) // Ignore write errors in websocket
 			
 			// Add queued messages to the current WebSocket message
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.send)
+				_, _ = w.Write([]byte{'\n'}) // Ignore write errors
+				_, _ = w.Write(<-c.send) // Ignore write errors
 			}
 			
 			if err := w.Close(); err != nil {
@@ -455,7 +455,7 @@ func (c *Client) writePump() {
 			}
 			
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait)) // Ignore deadline errors
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

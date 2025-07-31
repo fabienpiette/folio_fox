@@ -121,8 +121,6 @@ func (m *Manager) Search(ctx context.Context, userID int64, request *models.Sear
 	// Collect and aggregate results
 	var allResults []models.SearchResult
 	var indexersSearched []models.IndexerSearchResult
-	errors := make([]error, 0)
-
 	for result := range resultsChan {
 		if result != nil {
 			allResults = append(allResults, result.Results...)
@@ -132,7 +130,6 @@ func (m *Manager) Search(ctx context.Context, userID int64, request *models.Sear
 
 	for err := range errorsChan {
 		if err != nil {
-			errors = append(errors, err)
 			m.logger.Warnf("Indexer search error: %v", err)
 		}
 	}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/fabienpiette/folio_fox/internal/models"
@@ -48,17 +49,25 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	// Parse optional parameters
 	if indexers := c.Query("indexers"); indexers != "" {
 		// Parse comma-separated indexer IDs
-		// This would need proper parsing implementation
+		for _, indexerStr := range strings.Split(indexers, ",") {
+			if indexerID, err := strconv.ParseInt(strings.TrimSpace(indexerStr), 10, 64); err == nil {
+				request.Indexers = append(request.Indexers, indexerID)
+			}
+		}
 	}
 
 	if formats := c.Query("formats"); formats != "" {
 		// Parse comma-separated formats
-		// This would need proper parsing implementation
+		for _, format := range strings.Split(formats, ",") {
+			request.Formats = append(request.Formats, strings.TrimSpace(format))
+		}
 	}
 
 	if languages := c.Query("languages"); languages != "" {
 		// Parse comma-separated language codes
-		// This would need proper parsing implementation
+		for _, lang := range strings.Split(languages, ",") {
+			request.Languages = append(request.Languages, strings.TrimSpace(lang))
+		}
 	}
 
 	if minQuality := c.Query("min_quality"); minQuality != "" {

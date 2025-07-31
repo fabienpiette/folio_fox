@@ -88,7 +88,7 @@ func (c *ProwlarrClient) TestConnection(ctx context.Context) (*models.IndexerTes
 	
 	body, err := io.ReadAll(resp.Body)
 	if err == nil {
-		json.Unmarshal(body, &statusResp)
+		_ = json.Unmarshal(body, &statusResp) // Ignore unmarshal errors for status parsing
 	}
 
 	capabilities := []string{"search", "rss", "indexer_management"}
@@ -263,12 +263,12 @@ func (c *ProwlarrClient) Search(ctx context.Context, request *models.SearchReque
 		qualityScore := c.calculateQualityScore(result.Seeders, result.Size)
 
 		var publishedDate *time.Time
-		_ = publishedDate // Variable kept for future use
 		if result.PublishDate != nil {
 			if t, err := time.Parse(time.RFC3339, *result.PublishDate); err == nil {
 				publishedDate = &t
 			}
 		}
+		_ = publishedDate // Variable kept for future use
 
 		results[i] = models.SearchResult{
 			IndexerID:       indexerID,
