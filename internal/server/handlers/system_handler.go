@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"time"
 
@@ -74,7 +73,7 @@ func (h *SystemHandler) checkDatabaseHealth() DatabaseStatus {
 	
 	// Test database connection with a simple query
 	var count int
-	err := h.container.DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+	err := h.container.GetDB().QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	
 	responseTime := time.Since(start).Milliseconds()
 	
@@ -89,7 +88,7 @@ func (h *SystemHandler) checkDatabaseHealth() DatabaseStatus {
 	}
 
 	// Get connection stats if available
-	stats := h.container.DB.Stats()
+	stats := h.container.GetDB().Stats()
 	connections := stats.OpenConnections
 
 	status := "healthy"
@@ -110,7 +109,7 @@ func (h *SystemHandler) checkIndexersStatus() IndexersStatus {
 	var total, online int
 	
 	// Get total indexers
-	err := h.container.DB.QueryRow("SELECT COUNT(*) FROM indexers").Scan(&total)
+	err := h.container.GetDB().QueryRow("SELECT COUNT(*) FROM indexers").Scan(&total)
 	if err != nil {
 		return IndexersStatus{
 			Total:  0,
@@ -122,7 +121,7 @@ func (h *SystemHandler) checkIndexersStatus() IndexersStatus {
 	// Get online indexers (is_active = true and health_status = 'healthy')
 	query := `SELECT COUNT(*) FROM indexers WHERE is_active = true AND 
 			  (health_status = 'healthy' OR health_status IS NULL)`
-	err = h.container.DB.QueryRow(query).Scan(&online)
+	err = h.container.GetDB().QueryRow(query).Scan(&online)
 	if err != nil {
 		online = 0
 	}
@@ -149,7 +148,7 @@ func (h *SystemHandler) checkDownloadServiceStatus() DownloadServiceStatus {
 	query := `SELECT COUNT(*) FROM download_queue 
 			  WHERE status IN ('downloading', 'processing')`
 	
-	err := h.container.DB.QueryRow(query).Scan(&activeDownloads)
+	err := h.container.GetDB().QueryRow(query).Scan(&activeDownloads)
 	if err != nil {
 		return DownloadServiceStatus{
 			Status:          "error",

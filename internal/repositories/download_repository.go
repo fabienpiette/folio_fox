@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/fabienpiette/folio_fox/internal/models"
 )
@@ -437,7 +436,7 @@ func (r *SQLiteDownloadRepository) ListHistoryItems(ctx context.Context, filters
 			&item.DownloadPath, &item.CompletedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		items = append(items, item)
 	}

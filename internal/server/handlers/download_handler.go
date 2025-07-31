@@ -569,13 +569,13 @@ func (h *DownloadHandler) GetDashboardStats(c *gin.Context) {
 		// For non-admin users, count books they have downloaded
 		bookQuery = `SELECT COUNT(DISTINCT book_id) FROM download_queue 
 					WHERE user_id = ? AND book_id IS NOT NULL AND status = 'completed'`
-		err := h.container.DB.QueryRow(bookQuery, userID.(int64)).Scan(&totalBooks)
+		err := h.container.GetDB().QueryRow(bookQuery, userID.(int64)).Scan(&totalBooks)
 		if err != nil {
 			h.container.GetLogger().Errorf("Failed to get books count: %v", err)
 			totalBooks = 0
 		}
 	} else {
-		err := h.container.DB.QueryRow(bookQuery).Scan(&totalBooks)
+		err := h.container.GetDB().QueryRow(bookQuery).Scan(&totalBooks)
 		if err != nil {
 			h.container.GetLogger().Errorf("Failed to get books count: %v", err)
 			totalBooks = 0
@@ -586,7 +586,7 @@ func (h *DownloadHandler) GetDashboardStats(c *gin.Context) {
 	// Get active downloads count
 	var activeDownloads int
 	activeQuery := "SELECT COUNT(*) FROM download_queue WHERE status IN ('downloading', 'processing')" + userFilter
-	err := h.container.DB.QueryRow(activeQuery, args...).Scan(&activeDownloads)
+	err := h.container.GetDB().QueryRow(activeQuery, args...).Scan(&activeDownloads)
 	if err != nil {
 		h.container.GetLogger().Errorf("Failed to get active downloads count: %v", err)
 		activeDownloads = 0
@@ -596,7 +596,7 @@ func (h *DownloadHandler) GetDashboardStats(c *gin.Context) {
 	// Get queue items count (pending/queued)
 	var queueItems int
 	queueQuery := "SELECT COUNT(*) FROM download_queue WHERE status IN ('pending', 'queued')" + userFilter
-	err = h.container.DB.QueryRow(queueQuery, args...).Scan(&queueItems)
+	err = h.container.GetDB().QueryRow(queueQuery, args...).Scan(&queueItems)
 	if err != nil {
 		h.container.GetLogger().Errorf("Failed to get queue items count: %v", err)
 		queueItems = 0
@@ -606,7 +606,7 @@ func (h *DownloadHandler) GetDashboardStats(c *gin.Context) {
 	// Get failed downloads count
 	var failedDownloads int
 	failedQuery := "SELECT COUNT(*) FROM download_queue WHERE status IN ('failed', 'error', 'cancelled')" + userFilter
-	err = h.container.DB.QueryRow(failedQuery, args...).Scan(&failedDownloads)
+	err = h.container.GetDB().QueryRow(failedQuery, args...).Scan(&failedDownloads)
 	if err != nil {
 		h.container.GetLogger().Errorf("Failed to get failed downloads count: %v", err)
 		failedDownloads = 0
@@ -616,7 +616,7 @@ func (h *DownloadHandler) GetDashboardStats(c *gin.Context) {
 	// Get completed downloads count
 	var completedDownloads int
 	completedQuery := "SELECT COUNT(*) FROM download_queue WHERE status = 'completed'" + userFilter
-	err = h.container.DB.QueryRow(completedQuery, args...).Scan(&completedDownloads)
+	err = h.container.GetDB().QueryRow(completedQuery, args...).Scan(&completedDownloads)
 	if err != nil {
 		h.container.GetLogger().Errorf("Failed to get completed downloads count: %v", err)
 		completedDownloads = 0

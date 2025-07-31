@@ -224,14 +224,18 @@ func (c *Container) GetConfig() *config.Config {
 	return c.config
 }
 
+// GetDB returns the database connection
+func (c *Container) GetDB() *sql.DB {
+	return c.db
+}
+
 // initializeRepositories creates all repository instances
 func (c *Container) initializeRepositories() {
 	// Initialize repositories
 	c.userRepo = repositories.NewUserRepository(c.db)
-	
+	c.bookRepo = repositories.NewBookRepository(c.db)
+	c.downloadRepo = repositories.NewDownloadRepository(c.db)
 	// TODO: Implement other repositories when needed
-	// c.bookRepo = repositories.NewBookRepository(c.db)
-	// c.downloadRepo = repositories.NewDownloadRepository(c.db)
 	// c.indexerRepo = repositories.NewIndexerRepository(c.db)
 	// c.searchRepo = repositories.NewSearchRepository(c.db, c.redisClient)
 	// c.userPrefRepo = repositories.NewUserPreferencesRepository(c.db)

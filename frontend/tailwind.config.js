@@ -86,6 +86,13 @@ export default {
         'slide-out': 'slideOut 0.3s ease-out',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
+      animationDelay: {
+        '200': '200ms',
+        '400': '400ms',
+        '600': '600ms',
+        '800': '800ms',
+        '1000': '1000ms',
+      },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
