@@ -62,40 +62,43 @@ const queryClient = new QueryClient({
       networkMode: 'online',
     },
   },
-  
-  // Global error handling
-  mutationCache: {
-    onError: (error, variables, context, mutation) => {
-      console.error('Mutation error:', error, {
-        variables,
-        context: context,
-        mutationKey: mutation.mutationKey,
-      })
-    },
-  },
-  
-  queryCache: {
-    onError: (error, query) => {
-      // Only log non-auth errors to avoid spam
-      const errorResponse = (error as {response?: {status?: number}})?.response
-      if (errorResponse?.status !== 401 && errorResponse?.status !== 403) {
-        console.error('Query error:', error, {
-          queryKey: query.queryKey,
-          queryHash: query.queryHash,
-        })
-      }
-    },
+})
+
+// Add global error handling for mutations
+queryClient.getMutationCache().subscribe((event) => {
+  if (event.type === 'observerResult' && event.mutation.state.status === 'error') {
+    const error = event.mutation.state.error
+    console.error('Mutation error:', error, {
+      variables: event.mutation.state.variables,
+      mutationKey: event.mutation.options.mutationKey,
+    })
+  }
+})
+
+// Add global error handling for queries
+queryClient.getQueryCache().subscribe((event) => {
+  if (event.type === 'observerResult' && event.query.state.status === 'error') {
+    const error = event.query.state.error
+    const errorResponse = (error as {response?: {status?: number}})?.response
     
-    onSuccess: (data, query) => {
-      // Optional: Log successful queries for debugging
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('Query success:', {
-          queryKey: query.queryKey,
-          dataSize: JSON.stringify(data).length,
-        })
-      }
-    },
-  },
+    // Only log non-auth errors to avoid spam
+    if (errorResponse?.status !== 401 && errorResponse?.status !== 403) {
+      console.error('Query error:', error, {
+        queryKey: event.query.queryKey,
+        queryHash: event.query.queryHash,
+      })
+    }
+  }
+  
+  if (event.type === 'observerResult' && event.query.state.status === 'success') {
+    // Optional: Log successful queries for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('Query success:', {
+        queryKey: event.query.queryKey,
+        dataSize: JSON.stringify(event.query.state.data).length,
+      })
+    }
+  }
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
