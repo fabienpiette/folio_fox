@@ -44,7 +44,7 @@ export function SearchFilters({
 }: SearchFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const updateFilter = (key: keyof SearchFiltersType, value: any) => {
+  const updateFilter = (key: keyof SearchFiltersType, value: SearchFiltersType[keyof SearchFiltersType]) => {
     onFiltersChange({ ...filters, [key]: value })
   }
 

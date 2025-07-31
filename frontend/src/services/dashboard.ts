@@ -48,7 +48,7 @@ export const dashboardService = {
       // Try to get stats from multiple endpoints
       const [queueResponse, statsResponse] = await Promise.allSettled([
         apiClient.get<{ downloads: DownloadQueueItem[] }>('/downloads/queue'),
-        apiClient.get<any>('/downloads/stats')
+        apiClient.get<{totalBooks?: number; activeDownloads?: number; failedDownloads?: number; total_downloads?: number; completed_downloads?: number}>('/downloads/stats')
       ])
 
       const stats: DashboardStats = {
@@ -148,7 +148,7 @@ export const dashboardService = {
 
   async getSystemStatus(): Promise<SystemStatus> {
     try {
-      const response = await apiClient.get<any>('/system/status')
+      const response = await apiClient.get<{database?: {status?: 'healthy' | 'unhealthy' | 'unknown'; message?: string}; indexers?: {total?: number; online?: number; status?: 'healthy' | 'degraded' | 'unhealthy'}; downloadService?: {status?: 'active' | 'idle' | 'error'; activeDownloads?: number}}>('/system/status')
       
       // If we get real data, parse it
       if (response && typeof response === 'object') {

@@ -12,9 +12,9 @@ import './index.css'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: (failureCount, error: any) => {
+      retry: (failureCount, error: unknown) => {
         // Don't retry on authentication errors
-        if (error?.response?.status === 401) return false
+        if ((error as {response?: {status?: number}})?.response?.status === 401) return false
         return failureCount < 3
       },
       staleTime: 5 * 60 * 1000, // 5 minutes

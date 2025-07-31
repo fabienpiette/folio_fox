@@ -6,7 +6,7 @@
  * accessibility compliance in real-world scenarios.
  */
 
-import { test, expect, Page, BrowserContext } from '@playwright/test'
+import { test, expect, Page } from '@playwright/test'
 import { injectAxeScript, checkA11y } from 'axe-playwright'
 
 // Test data

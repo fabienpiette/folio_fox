@@ -5,7 +5,7 @@
  * authentication flows, and frontend-backend communication.
  */
 
-import { describe, it, expect, beforeEach, vi, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '@/test/mocks/server'
 import { api } from '@/services/api'

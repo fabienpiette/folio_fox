@@ -1,6 +1,6 @@
 import { chromium, FullConfig } from '@playwright/test'
 
-async function globalSetup(config: FullConfig) {
+async function globalSetup(_config: FullConfig) {
   // Start a browser to warm up and ensure everything is ready
   const browser = await chromium.launch()
   const page = await browser.newPage()

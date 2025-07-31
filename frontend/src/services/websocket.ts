@@ -6,7 +6,7 @@ export class WebSocketService {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
-  private listeners = new Map<string, Set<(data: any) => void>>()
+  private listeners = new Map<string, Set<(data: unknown) => void>>()
 
   constructor() {
     this.connect()
@@ -72,7 +72,7 @@ export class WebSocketService {
     })
 
     // Handle all message types
-    this.socket.onAny((eventName: string, data: any) => {
+    this.socket.onAny((eventName: string, data: unknown) => {
       this.emit(eventName, data)
     })
   }
@@ -90,7 +90,7 @@ export class WebSocketService {
     }, this.reconnectDelay * Math.pow(2, this.reconnectAttempts))
   }
 
-  public subscribe(channel: string, callback: (data: any) => void) {
+  public subscribe(channel: string, callback: (data: unknown) => void) {
     if (!this.listeners.has(channel)) {
       this.listeners.set(channel, new Set())
     }
@@ -124,7 +124,7 @@ export class WebSocketService {
     }
   }
 
-  private emit(eventName: string, data: any) {
+  private emit(eventName: string, data: unknown) {
     const listeners = this.listeners.get(eventName)
     if (listeners) {
       listeners.forEach(callback => {
@@ -137,7 +137,7 @@ export class WebSocketService {
     }
   }
 
-  public send(eventName: string, data: any) {
+  public send(eventName: string, data: unknown) {
     if (this.socket?.connected) {
       this.socket.emit(eventName, data)
     } else {

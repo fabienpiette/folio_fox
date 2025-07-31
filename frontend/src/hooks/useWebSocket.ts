@@ -34,11 +34,11 @@ export function useWebSocket(enabled: boolean = true) {
     }
   }, [enabled, token])
 
-  const send = useCallback((eventName: string, data: any) => {
+  const send = useCallback((eventName: string, data: unknown) => {
     wsServiceRef.current.send(eventName, data)
   }, [])
 
-  const subscribe = useCallback((channel: string, callback: (data: any) => void) => {
+  const subscribe = useCallback((channel: string, callback: (data: unknown) => void) => {
     return wsServiceRef.current.subscribe(channel, callback)
   }, [])
 

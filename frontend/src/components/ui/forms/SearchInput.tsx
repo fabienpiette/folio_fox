@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useQuery } from '@tanstack/react-query'
 import { searchApi } from '@/services/searchApi'
@@ -38,7 +38,30 @@ export function SearchInput({
     staleTime: 30000, // 30 seconds
   })
 
-  const suggestions = suggestionsData?.suggestions || []
+  const suggestions = useMemo(() => suggestionsData?.suggestions || [], [suggestionsData?.suggestions])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    onChange(newValue)
+    setShowDropdown(showSuggestions && newValue.length >= 2)
+    setSelectedIndex(-1)
+  }
+
+  const handleSelectSuggestion = useCallback((suggestion: SearchSuggestion) => {
+    onChange(suggestion.text)
+    setShowDropdown(false)
+    setSelectedIndex(-1)
+    onSearch(suggestion.text)
+  }, [onChange, onSearch])
+
+  const handleSubmit = useCallback((e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (value.trim()) {
+      onSearch(value.trim())
+      setShowDropdown(false)
+      setSelectedIndex(-1)
+    }
+  }, [value, onSearch])
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -76,7 +99,7 @@ export function SearchInput({
       document.addEventListener('keydown', handleKeyDown)
       return () => document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showDropdown, suggestions, selectedIndex])
+  }, [showDropdown, suggestions, selectedIndex, handleSelectSuggestion, handleSubmit])
 
   // Handle clicks outside dropdown
   useEffect(() => {
@@ -94,29 +117,6 @@ export function SearchInput({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    onChange(newValue)
-    setShowDropdown(showSuggestions && newValue.length >= 2)
-    setSelectedIndex(-1)
-  }
-
-  const handleSelectSuggestion = (suggestion: SearchSuggestion) => {
-    onChange(suggestion.text)
-    setShowDropdown(false)
-    setSelectedIndex(-1)
-    onSearch(suggestion.text)
-  }
-
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (value.trim()) {
-      onSearch(value.trim())
-      setShowDropdown(false)
-      setSelectedIndex(-1)
-    }
-  }
 
   const handleClear = () => {
     onChange('')

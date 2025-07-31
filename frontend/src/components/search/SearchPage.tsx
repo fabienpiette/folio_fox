@@ -22,9 +22,9 @@ export function SearchPage() {
     queryFn: () => searchApi.getHistory(10, 30),
     staleTime: 5 * 60 * 1000,
     enabled: isAuthenticated && !authLoading, // Only fetch when authenticated
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: unknown) => {
       // Don't retry on auth errors to prevent logout loops
-      if (error?.response?.status === 401) {
+      if ((error as {response?: {status?: number}})?.response?.status === 401) {
         return false
       }
       return failureCount < 3
@@ -41,9 +41,9 @@ export function SearchPage() {
     queryKey: ['search', query, filters],
     queryFn: () => searchApi.search({ query, ...filters }),
     enabled: false, // Manual trigger only
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: unknown) => {
       // Don't retry on auth errors
-      if (error?.response?.status === 401) {
+      if ((error as {response?: {status?: number}})?.response?.status === 401) {
         return false
       }
       return failureCount < 3
@@ -86,8 +86,8 @@ export function SearchPage() {
     try {
       await searchApi.clearHistory()
       toast.success('Search history cleared')
-    } catch (error: any) {
-      if (error?.response?.status === 401) {
+    } catch (error: unknown) {
+      if ((error as {response?: {status?: number}})?.response?.status === 401) {
         toast.error('Session expired. Please log in again.')
       } else {
         toast.error('Failed to clear search history')
@@ -152,7 +152,7 @@ export function SearchPage() {
             <SearchResults
               results={searchResults}
               isLoading={isSearching}
-              error={searchError?.message}
+              error={(searchError as {message?: string})?.message}
               onDownload={handleDownload}
               onPreview={handlePreview}
             />

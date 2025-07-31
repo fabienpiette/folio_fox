@@ -50,7 +50,7 @@ export function usePerformanceMonitor(
     }
 
     // Get memory usage if available
-    const memoryUsage = (performance as any).memory?.usedJSHeapSize
+    const memoryUsage = (performance as Performance & {memory?: {usedJSHeapSize: number}}).memory?.usedJSHeapSize
 
     const metrics: PerformanceMetrics = {
       renderTime,
@@ -167,13 +167,13 @@ export function useMemoryMonitor(componentName: string, interval: number = 10000
   const memoryHistoryRef = useRef<number[]>([])
 
   useEffect(() => {
-    if (!(performance as any).memory) {
+    if (!(performance as Performance & {memory?: {usedJSHeapSize: number}}).memory) {
       console.warn('Memory monitoring not available in this browser')
       return
     }
 
     const checkMemory = () => {
-      const memoryUsage = (performance as any).memory.usedJSHeapSize
+      const memoryUsage = (performance as Performance & {memory?: {usedJSHeapSize: number}}).memory!.usedJSHeapSize
       memoryHistoryRef.current.push(memoryUsage)
       
       // Keep only last 10 samples
@@ -209,6 +209,6 @@ export function useMemoryMonitor(componentName: string, interval: number = 10000
 
   return {
     getMemoryHistory: () => [...memoryHistoryRef.current],
-    getCurrentMemoryUsage: () => (performance as any).memory?.usedJSHeapSize || 0,
+    getCurrentMemoryUsage: () => (performance as Performance & {memory?: {usedJSHeapSize: number}}).memory?.usedJSHeapSize || 0,
   }
 }
