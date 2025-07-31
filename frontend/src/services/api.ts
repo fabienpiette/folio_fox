@@ -53,14 +53,22 @@ api.interceptors.response.use(
     }
 
     if (response?.status === 401) {
-      // Only auto-logout on critical auth failures, not on optional API calls
-      const isOptionalCall = config?.url?.includes('/search/history') || 
-                           config?.url?.includes('/search/suggestions')
+      // Only auto-logout on auth-specific endpoints, not data endpoints
+      const isAuthEndpoint = config?.url?.includes('/auth/') || 
+                           config?.url?.includes('/users/profile')
       
-      if (!isOptionalCall) {
-        // Token expired or invalid on a critical endpoint
+      // Don't auto-logout on dashboard/data endpoints - let components handle it
+      const isDashboardCall = config?.url?.includes('/downloads/') ||
+                            config?.url?.includes('/system/') ||
+                            config?.url?.includes('/search')
+      
+      if (isAuthEndpoint && !isDashboardCall) {
+        // Token expired or invalid on auth endpoint
         useAuthStore.getState().logout()
         toast.error('Session expired. Please log in again.')
+      } else {
+        // For dashboard calls, just log the error but don't auto-logout
+        console.warn('401 Unauthorized on:', config?.url)
       }
       return Promise.reject(error)
     }

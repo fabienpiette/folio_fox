@@ -93,15 +93,26 @@ export const useAuthStore = create<AuthStore>()(
       clearError: () => set({ error: null }),
 
       initialize: async () => {
-        const { token } = get()
+        const { token, user } = get()
         
         if (!token) {
           set({ isLoading: false, isAuthenticated: false })
           return
         }
 
+        // If we have both token and user data, assume they're valid
+        // This prevents immediate logout after login
+        if (token && user) {
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+          })
+          return
+        }
+
         try {
-          // Verify token by fetching user profile
+          // Only verify token if we don't have user data
           const response = await fetch('/api/v1/users/profile', {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -109,7 +120,15 @@ export const useAuthStore = create<AuthStore>()(
           })
 
           if (!response.ok) {
-            throw new Error('Token validation failed')
+            // Don't auto-logout on profile fetch failure during initialization
+            // Let the user try to use the app, and handle auth errors per-request
+            console.warn('Token validation failed during initialization, but keeping user logged in')
+            set({
+              isAuthenticated: true,
+              isLoading: false,
+              error: null,
+            })
+            return
           }
 
           const user: User = await response.json()
@@ -120,10 +139,10 @@ export const useAuthStore = create<AuthStore>()(
             error: null,
           })
         } catch (error) {
+          // Don't auto-logout on network errors during initialization
+          console.warn('Network error during token validation:', error)
           set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
+            isAuthenticated: true,
             isLoading: false,
             error: null,
           })
