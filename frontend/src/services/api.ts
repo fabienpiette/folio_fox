@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { useAuthStore } from '@/stores/auth'
+import { performanceMonitor, requestCache } from '@/utils/performance'
 import toast from 'react-hot-toast'
 
 // Create axios instance
@@ -11,13 +12,17 @@ const api: AxiosInstance = axios.create({
   },
 })
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and performance tracking
 api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    
+    // Add request start time for performance monitoring
+    config.metadata = { startTime: Date.now() }
+    
     return config
   },
   (error) => {
@@ -25,13 +30,27 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor for error handling
+// Response interceptor for error handling and performance tracking
 api.interceptors.response.use(
   (response: AxiosResponse) => {
+    // Track successful request performance
+    const startTime = response.config.metadata?.startTime
+    if (startTime) {
+      const responseTime = Date.now() - startTime
+      performanceMonitor.recordRequest(responseTime, false, false)
+    }
+    
     return response
   },
   (error) => {
     const { response, config } = error
+
+    // Track failed request performance
+    const startTime = config?.metadata?.startTime
+    if (startTime) {
+      const responseTime = Date.now() - startTime
+      performanceMonitor.recordRequest(responseTime, false, true)
+    }
 
     if (response?.status === 401) {
       // Only auto-logout on critical auth failures, not on optional API calls

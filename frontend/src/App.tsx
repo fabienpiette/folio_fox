@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useSystemHealth } from '@/hooks/useSystemHealth'
+import { ErrorBoundary } from '@/components/ui/feedback'
 
 // Layout Components
 import { AuthLayout } from '@/components/layout/AuthLayout'
@@ -34,33 +35,79 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-950 text-dark-50">
-      <Routes>
-        {/* Authentication Routes */}
-        {!isAuthenticated ? (
-          <>
-            <Route path="/auth/*" element={<AuthLayout />}>
-              <Route path="login" element={<LoginPage />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/auth/login" replace />} />
-          </>
-        ) : (
-          /* Main Application Routes */
-          <>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="search" element={<SearchPage />} />
-              <Route path="downloads" element={<DownloadsPage />} />
-              <Route path="library" element={<LibraryPage />} />
-              <Route path="config/*" element={<ConfigurationPage />} />
-            </Route>
-            <Route path="/auth/*" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </>
-        )}
-      </Routes>
-    </div>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('Application Error:', error, errorInfo)
+        // In production, send to error reporting service
+        if (process.env.NODE_ENV === 'production') {
+          // Example: sendErrorToReportingService(error, errorInfo)
+        }
+      }}
+      showDetails={process.env.NODE_ENV === 'development'}
+    >
+      <div className="min-h-screen bg-dark-950 text-dark-50">
+        <Routes>
+          {/* Authentication Routes */}
+          {!isAuthenticated ? (
+            <>
+              <Route path="/auth/*" element={<AuthLayout />}>
+                <Route path="login" element={<LoginPage />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/auth/login" replace />} />
+            </>
+          ) : (
+            /* Main Application Routes */
+            <>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route 
+                  path="dashboard" 
+                  element={
+                    <ErrorBoundary>
+                      <DashboardPage />
+                    </ErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="search" 
+                  element={
+                    <ErrorBoundary>
+                      <SearchPage />
+                    </ErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="downloads" 
+                  element={
+                    <ErrorBoundary>
+                      <DownloadsPage />
+                    </ErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="library" 
+                  element={
+                    <ErrorBoundary>
+                      <LibraryPage />
+                    </ErrorBoundary>
+                  } 
+                />
+                <Route 
+                  path="config/*" 
+                  element={
+                    <ErrorBoundary>
+                      <ConfigurationPage />
+                    </ErrorBoundary>
+                  } 
+                />
+              </Route>
+              <Route path="/auth/*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </>
+          )}
+        </Routes>
+      </div>
+    </ErrorBoundary>
   )
 }
 

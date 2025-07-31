@@ -1313,6 +1313,26 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /downloads/dashboard-stats:
+    get:
+      tags: [Download Management]
+      summary: Get dashboard statistics
+      description: |
+        Get summarized statistics for the dashboard including total books,
+        active downloads, queue items, and failed downloads. Used by frontend
+        dashboard components for real-time status display.
+      responses:
+        '200':
+          description: Dashboard statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2282,6 +2302,31 @@ components:
               percentage:
                 type: number
 
+    DashboardStatsResponse:
+      type: object
+      required: [totalBooks, activeDownloads, queueItems, failedDownloads]
+      properties:
+        totalBooks:
+          type: integer
+          description: Total number of books in the library
+          example: 1234
+        completed_downloads:
+          type: integer
+          description: Number of completed downloads
+          example: 987
+        activeDownloads:
+          type: integer
+          description: Number of currently active/downloading items
+          example: 3
+        queueItems:
+          type: integer
+          description: Number of items waiting in the download queue
+          example: 12
+        failedDownloads:
+          type: integer
+          description: Number of failed download attempts
+          example: 5
+
     # ===================================================================
     # COMMON SCHEMAS
     # ===================================================================
@@ -2455,6 +2500,21 @@ components:
             instance: "/api/v1/search"
             timestamp: "2025-07-28T10:30:00Z"
             request_id: "req_123456789"
+
+    InternalServerError:
+      description: Internal Server Error - Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: "https://api.foliofox.local/problems/internal-server-error"
+            title: "Internal Server Error"
+            status: 500
+            detail: "An unexpected error occurred while processing the request"
+            instance: "/api/v1/downloads/dashboard-stats"
+            timestamp: "2025-07-31T10:30:00Z"
+            request_id: "req_987654321"
 
 tags:
   - name: Authentication

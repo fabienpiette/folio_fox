@@ -24,6 +24,38 @@ const mockSystemHealth: SystemHealth = {
 }
 
 export const systemHandlers = [
+  // Dashboard stats endpoint (real endpoint used by dashboard)
+  http.get('/api/v1/downloads/dashboard-stats', () => {
+    return HttpResponse.json({
+      totalBooks: 1250,
+      completed_downloads: 3400,
+      activeDownloads: 3,
+      queueItems: 12,
+      failedDownloads: 8
+    })
+  }),
+
+  // System status endpoint (real endpoint used by dashboard)
+  http.get('/api/v1/system/status', () => {
+    return HttpResponse.json({
+      database: {
+        status: 'healthy',
+        message: 'Connected to PostgreSQL',
+        response_ms: 5,
+        connections: 10
+      },
+      indexers: {
+        total: 5,
+        online: 4,
+        status: 'degraded'
+      },
+      downloadService: {
+        status: 'active',
+        activeDownloads: 3
+      }
+    })
+  }),
+
   // Health check - overall
   http.get('/api/v1/health', () => {
     return HttpResponse.json(mockSystemHealth)

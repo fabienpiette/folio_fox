@@ -44,6 +44,28 @@ paths:
   # HEALTH MONITORING
   # ===================================================================
 
+  /status:
+    get:
+      tags: [Health Monitoring]
+      summary: System status with detailed health checks
+      description: |
+        Get comprehensive system status including database health, indexer status,
+        and download service status. This endpoint provides detailed health information
+        used by the frontend dashboard for real-time system monitoring.
+      responses:
+        '200':
+          description: System status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatusResponse'
+        '503':
+          description: System is experiencing issues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatusResponse'
+
   /health:
     get:
       tags: [Health Monitoring]
@@ -1399,6 +1421,71 @@ components:
         network_tx_bytes:
           type: integer
 
+    SystemStatusResponse:
+      type: object
+      required: [database, indexers, downloadService]
+      properties:
+        database:
+          $ref: '#/components/schemas/DatabaseStatusDetail'
+        indexers:
+          $ref: '#/components/schemas/IndexersStatusDetail'
+        downloadService:
+          $ref: '#/components/schemas/DownloadServiceStatusDetail'
+
+    DatabaseStatusDetail:
+      type: object
+      required: [status, response_ms, connections]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          example: healthy
+        message:
+          type: string
+          nullable: true
+          description: Additional status message or error details
+          example: null
+        response_ms:
+          type: integer
+          description: Database response time in milliseconds
+          example: 12
+        connections:
+          type: integer
+          description: Number of active database connections
+          example: 5
+
+    IndexersStatusDetail:
+      type: object
+      required: [total, online, status]
+      properties:
+        total:
+          type: integer
+          description: Total number of configured indexers
+          example: 10
+        online:
+          type: integer
+          description: Number of healthy/online indexers
+          example: 8
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          example: degraded
+          description: Overall indexer service status
+
+    DownloadServiceStatusDetail:
+      type: object
+      required: [status, activeDownloads]
+      properties:
+        status:
+          type: string
+          enum: [active, idle, error]
+          example: active
+          description: Current download service status
+        activeDownloads:
+          type: integer
+          description: Number of currently active downloads
+          example: 3
+
     # ===================================================================
     # METRICS SCHEMAS
     # ===================================================================
@@ -2259,25 +2346,49 @@ components:
         type:
           type: string
           format: uri
-          description: A URI reference that identifies the problem type
+          description: A URI reference that identifies the problem type (RFC 7807)
+          example: "https://api.foliofox.local/problems/database-unavailable"
         title:
           type: string
           description: A short, human-readable summary of the problem
+          example: "Database Unavailable"
         status:
           type: integer
           description: HTTP status code
+          example: 503
         detail:
           type: string
           description: Human-readable explanation specific to this occurrence
+          example: "The database service is currently unavailable. Please try again later."
         instance:
           type: string
           format: uri
           description: URI reference that identifies the specific occurrence
+          example: "/api/v1/system/status"
         timestamp:
           type: string
           format: date-time
+          description: Timestamp when the error occurred
+          example: "2025-07-31T10:30:00Z"
         request_id:
           type: string
+          description: Unique identifier for the request (for debugging)
+          example: "req_abc123xyz789"
+        errors:
+          type: array
+          description: Detailed validation errors (if applicable)
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: "timeout_seconds"
+              code:
+                type: string
+                example: "range_error"
+              message:
+                type: string
+                example: "Value must be between 5 and 300"
 
   responses:
     BadRequest:

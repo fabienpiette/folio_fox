@@ -254,12 +254,40 @@ export interface DownloadQueueResponse {
   pagination: PaginationInfo
   queue_stats: {
     total_items: number
-    pending_count: number
-    downloading_count: number
-    completed_count: number
-    failed_count: number
-    total_size_bytes: number
-    estimated_completion: string | null
+    pending_count?: number
+    downloading_count?: number
+    completed_count?: number
+    failed_count?: number
+    total_size_bytes?: number
+    estimated_completion?: string | null
+  }
+}
+
+// Dashboard-specific types matching backend implementation
+export interface DashboardStatsResponse {
+  totalBooks: number
+  completed_downloads: number
+  activeDownloads: number
+  queueItems: number
+  failedDownloads: number
+}
+
+// System status types matching backend implementation
+export interface SystemStatusResponse {
+  database: {
+    status: 'healthy' | 'degraded' | 'unhealthy'
+    message?: string | null
+    response_ms: number
+    connections: number
+  }
+  indexers: {
+    total: number
+    online: number
+    status: 'healthy' | 'degraded' | 'unhealthy'
+  }
+  downloadService: {
+    status: 'active' | 'idle' | 'error'
+    activeDownloads: number
   }
 }
 

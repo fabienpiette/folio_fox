@@ -531,3 +531,97 @@ func (h *DownloadHandler) GetStats(c *gin.Context) {
 
 	c.JSON(http.StatusOK, stats)
 }
+
+// DashboardStatsResponse represents dashboard statistics response
+type DashboardStatsResponse struct {
+	TotalBooks        int `json:"totalBooks"`
+	CompletedDownloads int `json:"completed_downloads"`
+	ActiveDownloads   int `json:"activeDownloads"`
+	QueueItems        int `json:"queueItems"`
+	FailedDownloads   int `json:"failedDownloads"`
+}
+
+// GetDashboardStats returns dashboard statistics for frontend
+func (h *DownloadHandler) GetDashboardStats(c *gin.Context) {
+	// Extract user ID for non-admin users
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	isAdmin, _ := c.Get("is_admin")
+	var userFilter string
+	var args []interface{}
+	
+	// Apply user filter for non-admin users
+	if !isAdmin.(bool) {
+		userFilter = " WHERE user_id = ?"
+		args = append(args, userID.(int64))
+	}
+
+	response := DashboardStatsResponse{}
+
+	// Get total books count (from library)
+	var totalBooks int
+	bookQuery := "SELECT COUNT(*) FROM books"
+	if !isAdmin.(bool) {
+		// For non-admin users, count books they have downloaded
+		bookQuery = `SELECT COUNT(DISTINCT book_id) FROM download_queue 
+					WHERE user_id = ? AND book_id IS NOT NULL AND status = 'completed'`
+		err := h.container.DB.QueryRow(bookQuery, userID.(int64)).Scan(&totalBooks)
+		if err != nil {
+			h.container.GetLogger().Errorf("Failed to get books count: %v", err)
+			totalBooks = 0
+		}
+	} else {
+		err := h.container.DB.QueryRow(bookQuery).Scan(&totalBooks)
+		if err != nil {
+			h.container.GetLogger().Errorf("Failed to get books count: %v", err)
+			totalBooks = 0
+		}
+	}
+	response.TotalBooks = totalBooks
+
+	// Get active downloads count
+	var activeDownloads int
+	activeQuery := "SELECT COUNT(*) FROM download_queue WHERE status IN ('downloading', 'processing')" + userFilter
+	err := h.container.DB.QueryRow(activeQuery, args...).Scan(&activeDownloads)
+	if err != nil {
+		h.container.GetLogger().Errorf("Failed to get active downloads count: %v", err)
+		activeDownloads = 0
+	}
+	response.ActiveDownloads = activeDownloads
+
+	// Get queue items count (pending/queued)
+	var queueItems int
+	queueQuery := "SELECT COUNT(*) FROM download_queue WHERE status IN ('pending', 'queued')" + userFilter
+	err = h.container.DB.QueryRow(queueQuery, args...).Scan(&queueItems)
+	if err != nil {
+		h.container.GetLogger().Errorf("Failed to get queue items count: %v", err)
+		queueItems = 0
+	}
+	response.QueueItems = queueItems
+
+	// Get failed downloads count
+	var failedDownloads int
+	failedQuery := "SELECT COUNT(*) FROM download_queue WHERE status IN ('failed', 'error', 'cancelled')" + userFilter
+	err = h.container.DB.QueryRow(failedQuery, args...).Scan(&failedDownloads)
+	if err != nil {
+		h.container.GetLogger().Errorf("Failed to get failed downloads count: %v", err)
+		failedDownloads = 0
+	}
+	response.FailedDownloads = failedDownloads
+
+	// Get completed downloads count
+	var completedDownloads int
+	completedQuery := "SELECT COUNT(*) FROM download_queue WHERE status = 'completed'" + userFilter
+	err = h.container.DB.QueryRow(completedQuery, args...).Scan(&completedDownloads)
+	if err != nil {
+		h.container.GetLogger().Errorf("Failed to get completed downloads count: %v", err)
+		completedDownloads = 0
+	}
+	response.CompletedDownloads = completedDownloads
+
+	c.JSON(http.StatusOK, response)
+}

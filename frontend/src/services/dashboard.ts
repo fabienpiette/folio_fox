@@ -2,6 +2,7 @@ import { apiClient } from './api'
 
 export interface DashboardStats {
   totalBooks: number
+  completed_downloads: number
   activeDownloads: number
   queueItems: number
   failedDownloads: number
@@ -45,53 +46,31 @@ export interface DownloadQueueItem {
 export const dashboardService = {
   async getStats(): Promise<DashboardStats> {
     try {
-      // Try to get stats from multiple endpoints
-      const [queueResponse, statsResponse] = await Promise.allSettled([
-        apiClient.get<{ downloads: DownloadQueueItem[] }>('/downloads/queue'),
-        apiClient.get<{totalBooks?: number; activeDownloads?: number; failedDownloads?: number; total_downloads?: number; completed_downloads?: number}>('/downloads/stats')
-      ])
+      // Use the new unified dashboard stats endpoint
+      const response = await apiClient.get<{
+        totalBooks: number
+        completed_downloads: number
+        activeDownloads: number
+        queueItems: number
+        failedDownloads: number
+      }>('/downloads/dashboard-stats')
 
-      const stats: DashboardStats = {
+      return {
+        totalBooks: response.totalBooks,
+        completed_downloads: response.completed_downloads,
+        activeDownloads: response.activeDownloads,
+        queueItems: response.queueItems,
+        failedDownloads: response.failedDownloads
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error)
+      // Return empty stats instead of fake data
+      return {
         totalBooks: 0,
+        completed_downloads: 0,
         activeDownloads: 0,
         queueItems: 0,
         failedDownloads: 0
-      }
-
-      // Process queue data if successful
-      if (queueResponse.status === 'fulfilled' && queueResponse.value?.downloads) {
-        const downloads = queueResponse.value.downloads
-        stats.queueItems = downloads.length
-        stats.activeDownloads = downloads.filter(d => 
-          d.status === 'downloading' || d.status === 'processing'
-        ).length
-        stats.failedDownloads = downloads.filter(d => 
-          d.status === 'failed' || d.status === 'error'
-        ).length
-      }
-
-      // Process stats data if successful
-      if (statsResponse.status === 'fulfilled' && statsResponse.value) {
-        const downloadStats = statsResponse.value
-        if (downloadStats.total_downloads) {
-          stats.totalBooks = downloadStats.completed_downloads || 0
-        }
-      }
-
-      // If we don't have real data, provide reasonable defaults
-      if (stats.totalBooks === 0) {
-        stats.totalBooks = 1247 // Keep original fake data as fallback
-      }
-
-      return stats
-    } catch (error) {
-      console.warn('Failed to fetch dashboard stats, using fallback data:', error)
-      // Return fallback data if API fails
-      return {
-        totalBooks: 1247,
-        activeDownloads: 3,
-        queueItems: 12,
-        failedDownloads: 2
       }
     }
   },
@@ -116,75 +95,66 @@ export const dashboardService = {
         }))
       }
 
-      throw new Error('No downloads data received')
+      // Return empty array instead of fake data
+      return []
     } catch (error) {
-      console.warn('Failed to fetch recent downloads, using fallback data:', error)
-      // Return fallback data
-      return [
-        {
-          id: '1',
-          title: 'Foundation',
-          author: 'Isaac Asimov',
-          status: 'completed',
-          created_at: new Date(Date.now() - 3600000).toISOString()
-        },
-        {
-          id: '2',
-          title: 'Dune',
-          author: 'Frank Herbert',
-          status: 'downloading',
-          created_at: new Date(Date.now() - 1800000).toISOString()
-        },
-        {
-          id: '3',
-          title: 'Neuromancer',
-          author: 'William Gibson',
-          status: 'queued',
-          created_at: new Date(Date.now() - 900000).toISOString()
-        }
-      ]
+      console.error('Failed to fetch recent downloads:', error)
+      // Return empty array instead of fake data
+      return []
     }
   },
 
   async getSystemStatus(): Promise<SystemStatus> {
     try {
-      const response = await apiClient.get<{database?: {status?: 'healthy' | 'unhealthy' | 'unknown'; message?: string}; indexers?: {total?: number; online?: number; status?: 'healthy' | 'degraded' | 'unhealthy'}; downloadService?: {status?: 'active' | 'idle' | 'error'; activeDownloads?: number}}>('/system/status')
-      
-      // If we get real data, parse it
-      if (response && typeof response === 'object') {
-        return {
-          database: {
-            status: response.database?.status || 'healthy',
-            message: response.database?.message
-          },
-          indexers: {
-            total: response.indexers?.total || 3,
-            online: response.indexers?.online || 3,
-            status: response.indexers?.status || 'healthy'
-          },
-          downloadService: {
-            status: response.downloadService?.status || 'active',
-            activeDownloads: response.downloadService?.activeDownloads || 1
-          }
+      const response = await apiClient.get<{
+        database: {
+          status: 'healthy' | 'unhealthy' | 'unknown'
+          message?: string
+          response_ms: number
+          connections: number
         }
-      }
-
-      throw new Error('Invalid system status response')
-    } catch (error) {
-      console.warn('Failed to fetch system status, using fallback data:', error)
-      // Return fallback data
+        indexers: {
+          total: number
+          online: number
+          status: 'healthy' | 'degraded' | 'unhealthy'
+        }
+        downloadService: {
+          status: 'active' | 'idle' | 'error'
+          activeDownloads: number
+        }
+      }>('/system/status')
+      
       return {
         database: {
-          status: 'healthy'
+          status: response.database.status,
+          message: response.database.message
         },
         indexers: {
-          total: 3,
-          online: 3,
-          status: 'healthy'
+          total: response.indexers.total,
+          online: response.indexers.online,
+          status: response.indexers.status
         },
         downloadService: {
-          status: 'active',
-          activeDownloads: 1
+          status: response.downloadService.status,
+          activeDownloads: response.downloadService.activeDownloads
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch system status:', error)
+      // Return unknown status instead of fake data
+      return {
+        database: {
+          status: 'unknown',
+          message: 'Unable to connect to system status endpoint'
+        },
+        indexers: {
+          total: 0,
+          online: 0,
+          status: 'unhealthy'
+        },
+        downloadService: {
+          status: 'error',
+          activeDownloads: 0
         }
       }
     }

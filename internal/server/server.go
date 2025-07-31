@@ -207,6 +207,7 @@ func (s *HTTPServer) setupRoutes() {
 		downloadGroup.POST("/queue/batch", downloadHandler.BatchOperation)
 		downloadGroup.GET("/history", downloadHandler.GetHistory)
 		downloadGroup.GET("/stats", downloadHandler.GetStats)
+		downloadGroup.GET("/dashboard-stats", downloadHandler.GetDashboardStats)
 	}
 	
 	// Indexer management

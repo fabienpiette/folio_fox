@@ -1,4 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { usePerformanceMetrics } from '@/utils/performance'
 
 interface PerformanceMetrics {
   renderTime: number
@@ -210,5 +212,223 @@ export function useMemoryMonitor(componentName: string, interval: number = 10000
   return {
     getMemoryHistory: () => [...memoryHistoryRef.current],
     getCurrentMemoryUsage: () => (performance as Performance & {memory?: {usedJSHeapSize: number}}).memory?.usedJSHeapSize || 0,
+  }
+}
+
+/**
+ * Enhanced performance monitor with query statistics and recommendations
+ */
+export function useEnhancedPerformanceMonitor(componentName: string) {
+  const [metrics, setMetrics] = useState<{
+    renderTime: number
+    componentMounts: number
+    reRenders: number
+    memoryUsage?: number
+    queryStats: {
+      successRate: number
+      averageResponseTime: number
+      cacheHitRate: number
+      totalRequests: number
+      errorRate: number
+    }
+    lastUpdated: number
+  }>({
+    renderTime: 0,
+    componentMounts: 0,
+    reRenders: 0,
+    queryStats: {
+      successRate: 0,
+      averageResponseTime: 0,
+      cacheHitRate: 0,
+      totalRequests: 0,
+      errorRate: 0
+    },
+    lastUpdated: Date.now()
+  })
+
+  const renderStart = useRef(performance.now())
+  const renderCount = useRef(0)
+  const mountTime = useRef(Date.now())
+  const queryClient = useQueryClient()
+  const { getMetrics } = usePerformanceMetrics()
+
+  // Track component lifecycle and render performance
+  useEffect(() => {
+    const renderEnd = performance.now()
+    const renderDuration = renderEnd - renderStart.current
+    renderCount.current += 1
+
+    setMetrics(prev => ({
+      ...prev,
+      componentMounts: prev.componentMounts + (renderCount.current === 1 ? 1 : 0),
+      reRenders: renderCount.current,
+      renderTime: renderDuration,
+      lastUpdated: Date.now()
+    }))
+
+    // Reset render start time for next render
+    renderStart.current = performance.now()
+  })
+
+  // Update query statistics
+  useEffect(() => {
+    const updateQueryStats = () => {
+      const performanceMetrics = getMetrics()
+      
+      setMetrics(prev => ({
+        ...prev,
+        queryStats: {
+          successRate: performanceMetrics.requestCount > 0 
+            ? ((performanceMetrics.requestCount - (performanceMetrics.requestCount * performanceMetrics.errorRate / 100)) / performanceMetrics.requestCount) * 100
+            : 0,
+          averageResponseTime: performanceMetrics.averageResponseTime,
+          cacheHitRate: performanceMetrics.cacheHitRate,
+          totalRequests: performanceMetrics.requestCount,
+          errorRate: performanceMetrics.errorRate
+        },
+        lastUpdated: Date.now()
+      }))
+    }
+
+    // Update stats every 5 seconds
+    const interval = setInterval(updateQueryStats, 5000)
+    updateQueryStats() // Initial update
+
+    return () => clearInterval(interval)
+  }, [getMetrics])
+
+  // Memory usage tracking
+  const trackMemoryUsage = useCallback(() => {
+    if ('memory' in performance) {
+      const memory = (performance as any).memory
+      setMetrics(prev => ({
+        ...prev,
+        memoryUsage: memory.usedJSHeapSize,
+        lastUpdated: Date.now()
+      }))
+    }
+  }, [])
+
+  // Get React Query cache statistics
+  const getQueryCacheStats = useCallback(() => {
+    const queryCache = queryClient.getQueryCache()
+    const queries = queryCache.getAll()
+    
+    const stats = queries.reduce((acc, query) => {
+      acc.total++
+      
+      if (query.state.status === 'success') {
+        acc.successful++
+      } else if (query.state.status === 'error') {
+        acc.failed++
+      }
+      
+      if (query.state.dataUpdatedAt > 0) {
+        acc.cached++
+      }
+      
+      return acc
+    }, { total: 0, successful: 0, failed: 0, cached: 0 })
+
+    return {
+      totalQueries: stats.total,
+      successfulQueries: stats.successful,
+      failedQueries: stats.failed,
+      cachedQueries: stats.cached,
+      cacheEfficiency: stats.total > 0 ? (stats.cached / stats.total) * 100 : 0
+    }
+  }, [queryClient])
+
+  // Performance analysis
+  const analyzePerformance = useCallback(() => {
+    const analysis = {
+      isPerformant: metrics.renderTime < 16, // 60fps = 16ms per frame
+      renderEfficiency: metrics.reRenders > 0 ? metrics.componentMounts / metrics.reRenders : 1,
+      memoryEfficient: metrics.memoryUsage ? metrics.memoryUsage < 50 * 1024 * 1024 : true, // < 50MB
+      queryPerformance: {
+        isHealthy: metrics.queryStats.errorRate < 5 && metrics.queryStats.averageResponseTime < 1000,
+        cacheEffective: metrics.queryStats.cacheHitRate > 70
+      }
+    }
+
+    return analysis
+  }, [metrics])
+
+  // Generate performance recommendations
+  const getRecommendations = useCallback(() => {
+    const analysis = analyzePerformance()
+    const recommendations: string[] = []
+
+    if (!analysis.isPerformant) {
+      recommendations.push('Consider memoizing expensive computations with useMemo')
+      recommendations.push('Use React.memo for component memoization')
+    }
+
+    if (analysis.renderEfficiency < 0.5) {
+      recommendations.push('Reduce unnecessary re-renders with useCallback')
+      recommendations.push('Check for proper dependency arrays in useEffect')
+    }
+
+    if (metrics.queryStats.cacheHitRate < 50) {
+      recommendations.push('Increase staleTime for frequently accessed queries')
+      recommendations.push('Consider implementing request deduplication')
+    }
+
+    if (metrics.queryStats.errorRate > 5) {
+      recommendations.push('Implement better error handling and retry logic')
+      recommendations.push('Add circuit breaker pattern for failing APIs')
+    }
+
+    if (metrics.queryStats.averageResponseTime > 1000) {
+      recommendations.push('Optimize API endpoints or add pagination')
+      recommendations.push('Consider implementing progressive loading')
+    }
+
+    return recommendations
+  }, [analyzePerformance, metrics.queryStats])
+
+  // Export comprehensive performance data
+  const exportMetrics = useCallback(() => {
+    const cacheStats = getQueryCacheStats()
+    const analysis = analyzePerformance()
+    const recommendations = getRecommendations()
+    
+    return {
+      component: componentName,
+      timestamp: new Date().toISOString(),
+      uptime: Date.now() - mountTime.current,
+      metrics,
+      cacheStats,
+      analysis,
+      recommendations
+    }
+  }, [componentName, metrics, getQueryCacheStats, analyzePerformance, getRecommendations])
+
+  // Log performance issues in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const analysis = analyzePerformance()
+      
+      if (!analysis.isPerformant) {
+        console.warn(`[${componentName}] Slow render detected: ${metrics.renderTime.toFixed(2)}ms`)
+      }
+      
+      if (metrics.reRenders > 10 && analysis.renderEfficiency < 0.5) {
+        console.warn(`[${componentName}] Excessive re-renders: ${metrics.reRenders}`)
+      }
+      
+      if (metrics.queryStats.errorRate > 10) {
+        console.warn(`[${componentName}] High query error rate: ${metrics.queryStats.errorRate.toFixed(1)}%`)
+      }
+    }
+  }, [componentName, metrics, analyzePerformance])
+
+  return {
+    metrics,
+    trackMemoryUsage,
+    getQueryCacheStats,
+    analyzePerformance,
+    getRecommendations,
+    exportMetrics
   }
 }
