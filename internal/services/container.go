@@ -237,10 +237,10 @@ func (c *Container) initializeRepositories() {
 	c.downloadRepo = repositories.NewDownloadRepository(c.db)
 	c.indexerRepo = repositories.NewIndexerRepository(c.db)
 	c.searchRepo = repositories.NewSearchRepository(c.db, c.redisClient)
+	c.userPrefRepo = repositories.NewUserPreferencesRepository(c.db)
+	c.systemRepo = repositories.NewSystemRepository(c.db)
 	// TODO: Implement other repositories when needed
-	// c.userPrefRepo = repositories.NewUserPreferencesRepository(c.db)
 	// c.bookFileRepo = repositories.NewBookFileRepository(c.db)
-	// c.systemRepo = repositories.NewSystemRepository(c.db)
 	
 	c.logger.Info("Repositories initialized")
 }

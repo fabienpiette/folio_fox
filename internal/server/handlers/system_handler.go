@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/fabienpiette/folio_fox/internal/repositories"
 	"github.com/fabienpiette/folio_fox/internal/services"
 )
 
@@ -170,7 +172,46 @@ func (h *SystemHandler) checkDownloadServiceStatus() DownloadServiceStatus {
 
 // GetLogs returns system logs
 func (h *SystemHandler) GetLogs(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "GetLogs not yet implemented"})
+	var filters repositories.LogFilters
+	
+	// Parse query parameters
+	if level := c.Query("level"); level != "" {
+		filters.Level = &level
+	}
+	if component := c.Query("component"); component != "" {
+		filters.Component = &component
+	}
+	if since := c.Query("since"); since != "" {
+		// Parse the since date - expected format: RFC3339 or similar
+		if sinceTime, err := time.Parse(time.RFC3339, since); err == nil {
+			filters.Since = &sinceTime
+		}
+	}
+	if until := c.Query("until"); until != "" {
+		if untilTime, err := time.Parse(time.RFC3339, until); err == nil {
+			filters.Until = &untilTime
+		}
+	}
+	if limit := c.Query("limit"); limit != "" {
+		if limitInt, err := strconv.Atoi(limit); err == nil {
+			filters.Limit = limitInt
+		}
+	} else {
+		filters.Limit = 100 // Default limit
+	}
+	if offset := c.Query("offset"); offset != "" {
+		if offsetInt, err := strconv.Atoi(offset); err == nil {
+			filters.Offset = offsetInt
+		}
+	}
+	
+	logs, err := h.container.GetSystemRepository().GetLogs(c.Request.Context(), &filters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve system logs"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"logs": logs})
 }
 
 // RunMaintenance runs maintenance tasks
@@ -180,10 +221,37 @@ func (h *SystemHandler) RunMaintenance(c *gin.Context) {
 
 // GetSettings returns system settings
 func (h *SystemHandler) GetSettings(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "GetSettings not yet implemented"})
+	settings, err := h.container.GetSystemRepository().GetAppSettings(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve system settings"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, settings)
 }
 
 // UpdateSettings updates system settings
 func (h *SystemHandler) UpdateSettings(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "UpdateSettings not yet implemented"})
+	var req map[string]string
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	for key, value := range req {
+		err := h.container.GetSystemRepository().SetAppSetting(c.Request.Context(), key, value)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update system settings"})
+			return
+		}
+	}
+	
+	// Return updated settings
+	settings, err := h.container.GetSystemRepository().GetAppSettings(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve updated settings"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, settings)
 }
