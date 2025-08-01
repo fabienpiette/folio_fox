@@ -219,6 +219,15 @@ func (s *HTTPServer) setupRoutes() {
 		indexerGroup.POST("/:id/test", indexerHandler.TestIndexer)
 		indexerGroup.GET("/:id/health", indexerHandler.GetIndexerHealth)
 		indexerGroup.PUT("/:id/config", indexerHandler.UpdateConfig)
+		
+		// Admin-only indexer management
+		adminIndexerGroup := indexerGroup.Group("/")
+		adminIndexerGroup.Use(middleware.AdminRequired())
+		{
+			adminIndexerGroup.POST("", indexerHandler.CreateIndexer)
+			adminIndexerGroup.PUT("/:id", indexerHandler.UpdateIndexer)
+			adminIndexerGroup.DELETE("/:id", indexerHandler.DeleteIndexer)
+		}
 	}
 	
 	// System management (admin only)
