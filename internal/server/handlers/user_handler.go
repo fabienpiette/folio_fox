@@ -303,6 +303,7 @@ func (h *UserHandler) CreateQualityProfile(c *gin.Context) {
 		MinQualityScore:     req.MinQualityScore,
 		MaxFileSizeMB:       req.MaxFileSizeMB,
 		LanguagePreferences: models.StringList(req.LanguagePreferences),
+		QualityOrder:        models.StringList(req.QualityOrder),
 		IsDefault:           req.IsDefault,
 	}
 	
@@ -370,6 +371,9 @@ func (h *UserHandler) UpdateQualityProfile(c *gin.Context) {
 	}
 	if req.LanguagePreferences != nil {
 		profile.LanguagePreferences = models.StringList(req.LanguagePreferences)
+	}
+	if req.QualityOrder != nil {
+		profile.QualityOrder = models.StringList(req.QualityOrder)
 	}
 	if req.IsDefault != nil {
 		profile.IsDefault = *req.IsDefault

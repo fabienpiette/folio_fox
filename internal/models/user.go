@@ -122,6 +122,7 @@ type QualityProfileCreateRequest struct {
 	MinQualityScore     int      `json:"min_quality_score,omitempty"`
 	MaxFileSizeMB       *int     `json:"max_file_size_mb,omitempty"`
 	LanguagePreferences []string `json:"language_preferences,omitempty"`
+	QualityOrder        []string `json:"quality_order,omitempty"`
 	IsDefault           bool     `json:"is_default,omitempty"`
 }
 
@@ -132,6 +133,7 @@ type QualityProfileUpdateRequest struct {
 	MinQualityScore     *int     `json:"min_quality_score,omitempty"`
 	MaxFileSizeMB       *int     `json:"max_file_size_mb,omitempty"`
 	LanguagePreferences []string `json:"language_preferences,omitempty"`
+	QualityOrder        []string `json:"quality_order,omitempty"`
 	IsDefault           *bool    `json:"is_default,omitempty"`
 }
 

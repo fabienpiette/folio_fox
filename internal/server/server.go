@@ -165,6 +165,18 @@ func (s *HTTPServer) setupRoutes() {
 		userGroup.PUT("/profile", userHandler.UpdateProfile)
 		userGroup.GET("/preferences", userHandler.GetPreferences)
 		userGroup.PUT("/preferences", userHandler.UpdatePreferences)
+		
+		// Download folders
+		userGroup.GET("/download-folders", userHandler.GetDownloadFolders)
+		userGroup.POST("/download-folders", userHandler.CreateDownloadFolder)
+		userGroup.PUT("/download-folders/:id", userHandler.UpdateDownloadFolder)
+		userGroup.DELETE("/download-folders/:id", userHandler.DeleteDownloadFolder)
+		
+		// Quality profiles
+		userGroup.GET("/quality-profiles", userHandler.GetQualityProfiles)
+		userGroup.POST("/quality-profiles", userHandler.CreateQualityProfile)
+		userGroup.PUT("/quality-profiles/:id", userHandler.UpdateQualityProfile)
+		userGroup.DELETE("/quality-profiles/:id", userHandler.DeleteQualityProfile)
 	}
 	
 	// Library management

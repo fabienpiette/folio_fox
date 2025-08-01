@@ -166,6 +166,7 @@ type QualityProfile struct {
 	MinQualityScore     int        `json:"min_quality_score" db:"min_quality_score"`
 	MaxFileSizeMB       *int       `json:"max_file_size_mb,omitempty" db:"max_file_size_mb"`
 	LanguagePreferences StringList `json:"language_preferences" db:"language_preferences"`
+	QualityOrder        StringList `json:"quality_order" db:"quality_order"`
 	IsDefault           bool       `json:"is_default" db:"is_default"`
 	CreatedAt           time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at" db:"updated_at"`
