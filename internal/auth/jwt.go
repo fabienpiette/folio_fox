@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -119,9 +120,14 @@ func (m *JWTManager) RefreshToken(tokenString string) (string, time.Time, error)
 // ValidateJWT validates a JWT token and returns user information
 // This is a standalone function for use in middleware
 func ValidateJWT(tokenString string) (int64, string, bool, error) {
-	// This is a simplified version that uses a default secret key
-	// In a real implementation, this should be injected from config
-	secretKey := "your-super-secret-jwt-key-change-this" // TODO: Get from config
+	// Get JWT secret from environment variable, fallback to config default
+	secretKey := os.Getenv("FOLIOFOX_AUTH_JWT_SECRET")
+	if secretKey == "" {
+		secretKey = os.Getenv("JWT_SECRET")
+	}
+	if secretKey == "" {
+		secretKey = "change-me-in-production" // Config default fallback
+	}
 	
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
