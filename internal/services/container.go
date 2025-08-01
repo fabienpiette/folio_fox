@@ -235,9 +235,9 @@ func (c *Container) initializeRepositories() {
 	c.userRepo = repositories.NewUserRepository(c.db)
 	c.bookRepo = repositories.NewBookRepository(c.db)
 	c.downloadRepo = repositories.NewDownloadRepository(c.db)
+	c.searchRepo = repositories.NewSearchRepository(c.db, c.redisClient)
 	// TODO: Implement other repositories when needed
 	// c.indexerRepo = repositories.NewIndexerRepository(c.db)
-	// c.searchRepo = repositories.NewSearchRepository(c.db, c.redisClient)
 	// c.userPrefRepo = repositories.NewUserPreferencesRepository(c.db)
 	// c.bookFileRepo = repositories.NewBookFileRepository(c.db)
 	// c.systemRepo = repositories.NewSystemRepository(c.db)
