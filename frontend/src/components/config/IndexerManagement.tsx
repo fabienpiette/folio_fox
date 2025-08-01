@@ -6,7 +6,8 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   XCircleIcon,
-  ClockIcon
+  ClockIcon,
+  CogIcon
 } from '@heroicons/react/24/outline'
 import { 
   useIndexers, 
@@ -17,6 +18,7 @@ import {
 import { IndexerResponse, IndexerStatus } from '@/types/config'
 import { LoadingSpinner } from '@/components/ui/feedback/LoadingSpinner'
 import { ApiErrorDisplay, createApiError } from '@/components/ui/feedback'
+import { IndexerConfigModal } from './IndexerConfigModal'
 import { cn } from '@/utils/cn'
 
 interface IndexerManagementProps {
@@ -31,6 +33,7 @@ export function IndexerManagement({
   userRole = 'user'
 }: IndexerManagementProps) {
   const [expandedIndexer, setExpandedIndexer] = useState<number | null>(null)
+  const [configureIndexer, setConfigureIndexer] = useState<IndexerResponse | null>(null)
   
   const { data: indexersData, isLoading, error, refetch } = useIndexers()
   const deleteIndexerMutation = useDeleteIndexer()
@@ -212,6 +215,15 @@ export function IndexerManagement({
                             <span>{indexer.response_time_ms}ms</span>
                           </>
                         )}
+                        {/* Configuration Status */}
+                        {(indexer.indexer_type === 'torznab' || indexer.indexer_type === 'newznab') && (
+                          <>
+                            <span>•</span>
+                            <span className={indexer.user_config?.api_key ? 'text-success-400' : 'text-warning-400'}>
+                              {indexer.user_config?.api_key ? 'Configured' : 'Not Configured'}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -237,6 +249,15 @@ export function IndexerManagement({
                     className="px-3 py-1.5 text-sm bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-md transition-colors disabled:opacity-50"
                   >
                     {testIndexerMutation.isPending ? 'Testing...' : 'Test'}
+                  </button>
+                  
+                  {/* Configure Button */}
+                  <button
+                    onClick={() => setConfigureIndexer(indexer)}
+                    className="p-2 text-dark-400 hover:text-primary-400 transition-colors"
+                    title="Configure indexer"
+                  >
+                    <CogIcon className="w-4 h-4" />
                   </button>
                   
                   {/* Edit Button */}
@@ -372,6 +393,17 @@ export function IndexerManagement({
           ))}
         </div>
       )}
+      
+      {/* Indexer Configuration Modal */}
+      <IndexerConfigModal
+        indexer={configureIndexer || undefined}
+        isOpen={!!configureIndexer}
+        onClose={() => setConfigureIndexer(null)}
+        onSuccess={() => {
+          setConfigureIndexer(null)
+          refetch()
+        }}
+      />
     </div>
   )
 }
