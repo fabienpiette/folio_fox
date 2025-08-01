@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { useAuthStore } from '@/stores/auth'
-import { performanceMonitor, requestCache } from '@/utils/performance'
+import { performanceMonitor } from '@/utils/performance'
 import toast from 'react-hot-toast'
 
 // Create axios instance

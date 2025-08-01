@@ -51,11 +51,6 @@ class RequestDeduplicationCache {
   private pendingRequests = new Map<string, Promise<any>>()
   private cache = new Map<string, { data: any; timestamp: number; ttl: number }>()
 
-  // Generate a unique key for the request
-  private generateKey(url: string, params?: Record<string, any>): string {
-    const paramString = params ? JSON.stringify(params) : ''
-    return `${url}${paramString}`
-  }
 
   // Get or create a deduplicated request
   async getOrFetch<T>(
@@ -257,13 +252,12 @@ export function scheduleBackgroundSync(
   queryClient: QueryClient,
   queries: Array<{
     queryKey: any[]
-    queryFn: () => Promise<any>
     interval: number
   }>
 ) {
   const intervals: NodeJS.Timeout[] = []
 
-  queries.forEach(({ queryKey, queryFn, interval }) => {
+  queries.forEach(({ queryKey, interval }) => {
     const intervalId = setInterval(() => {
       // Only sync if user is active and online
       if (document.visibilityState === 'visible' && navigator.onLine) {

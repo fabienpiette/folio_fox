@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { searchApi, SearchParams } from '@/services/searchApi'
 import { useDebounce, useRequestDeduplication, usePerformanceMetrics } from '@/utils/performance'
-import { SearchResponse, SearchSuggestion } from '@/types'
+import { SearchResponse } from '@/types'
 
 // Optimized search hook with debouncing and caching
 export function useOptimizedSearch(initialParams?: Partial<SearchParams>) {
@@ -79,7 +79,7 @@ export function useOptimizedSearch(initialParams?: Partial<SearchParams>) {
       hasResults: data.results && data.results.length > 0,
       resultCount: data.total_results || 0,
       pageCount: Math.ceil((data.total_results || 0) / (searchParams.limit || 20)),
-      searchTime: data.search_time_ms || 0
+      searchTime: data.search_duration_ms || 0
     }),
     
     meta: {
@@ -91,7 +91,7 @@ export function useOptimizedSearch(initialParams?: Partial<SearchParams>) {
   // Infinite search for pagination
   const infiniteSearchQuery = useInfiniteQuery({
     queryKey: ['search', 'infinite', searchParams],
-    queryFn: async ({ pageParam = 0 }) => {
+    queryFn: async ({ pageParam }: { pageParam: number }) => {
       const params = {
         ...searchParams,
         offset: pageParam * (searchParams.limit || 20)
@@ -111,11 +111,11 @@ export function useOptimizedSearch(initialParams?: Partial<SearchParams>) {
       }
     },
     
+    initialPageParam: 0,
     enabled: !!searchParams.query && searchParams.query.length > 2,
     
-    getNextPageParam: (lastPage, allPages) => {
+    getNextPageParam: (lastPage: SearchResponse, allPages: SearchResponse[]) => {
       const totalResults = lastPage.total_results || 0
-      const resultsPerPage = searchParams.limit || 20
       const currentResultCount = allPages.reduce((sum, page) => sum + (page.results?.length || 0), 0)
       
       return currentResultCount < totalResults ? allPages.length : undefined
@@ -128,9 +128,9 @@ export function useOptimizedSearch(initialParams?: Partial<SearchParams>) {
     select: (data) => ({
       pages: data.pages,
       pageParams: data.pageParams,
-      allResults: data.pages.flatMap(page => page.results || []),
+      allResults: data.pages.flatMap((page: SearchResponse) => page.results || []),
       totalResults: data.pages[0]?.total_results || 0,
-      hasNextPage: data.pages.length > 0 && data.pages[data.pages.length - 1].results?.length === (searchParams.limit || 20)
+      hasNextPage: data.pages.length > 0 && data.pages[data.pages.length - 1]?.results?.length === (searchParams.limit || 20)
     })
   })
 

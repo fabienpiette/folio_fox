@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { dashboardService } from '@/services/dashboard'
-import { createApiError } from '@/types/errors'
 
 export const useDashboardStats = () => {
   return useQuery({

@@ -66,7 +66,7 @@ const queryClient = new QueryClient({
 
 // Add global error handling for mutations
 queryClient.getMutationCache().subscribe((event) => {
-  if (event.type === 'observerResult' && event.mutation.state.status === 'error') {
+  if (event.type === 'updated' && event.mutation?.state.status === 'error') {
     const error = event.mutation.state.error
     console.error('Mutation error:', error, {
       variables: event.mutation.state.variables,
@@ -77,7 +77,7 @@ queryClient.getMutationCache().subscribe((event) => {
 
 // Add global error handling for queries
 queryClient.getQueryCache().subscribe((event) => {
-  if (event.type === 'observerResult' && event.query.state.status === 'error') {
+  if (event.type === 'updated' && event.query?.state.status === 'error') {
     const error = event.query.state.error
     const errorResponse = (error as {response?: {status?: number}})?.response
     
@@ -90,7 +90,7 @@ queryClient.getQueryCache().subscribe((event) => {
     }
   }
   
-  if (event.type === 'observerResult' && event.query.state.status === 'success') {
+  if (event.type === 'updated' && event.query?.state.status === 'success') {
     // Optional: Log successful queries for debugging
     if (process.env.NODE_ENV === 'development') {
       console.debug('Query success:', {

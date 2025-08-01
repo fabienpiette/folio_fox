@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { cn } from '@/utils/cn'
 import { ApiError, RetryOptions } from '@/types/errors'
 import { LoadingSpinner } from './LoadingSpinner'
 
 interface ApiErrorDisplayProps {
   error: ApiError
-  onRetry?: () => Promise<void> | void
+  onRetry?: () => Promise<any> | void
   retryOptions?: RetryOptions
   className?: string
   size?: 'sm' | 'md' | 'lg'

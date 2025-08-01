@@ -13,11 +13,6 @@ import {
   usePrefetchPopularSearches
 } from '@/hooks/useSearchOptimized'
 import { 
-  useDashboardStats, 
-  useRecentDownloads, 
-  useSystemStatus 
-} from '@/hooks/useDashboard'
-import { 
   useEnhancedPerformanceMonitor,
   useMemoryMonitor 
 } from '@/hooks/usePerformanceMonitor'
@@ -34,10 +29,7 @@ export function ExampleOptimizedDashboard() {
   const performanceMonitor = useEnhancedPerformanceMonitor('ExampleDashboard')
   const memoryMonitor = useMemoryMonitor('ExampleDashboard', 30000) // Check every 30s
   
-  // Use optimized dashboard hooks with enhanced caching
-  const { data: stats, isLoading: statsLoading } = useDashboardStats()
-  const { data: systemStatus, isLoading: statusLoading } = useSystemStatus()
-  const { data: downloads, isLoading: downloadsLoading } = useRecentDownloads()
+  // Use optimized dashboard hooks with enhanced caching - examples only
   
   // Export performance metrics for monitoring
   React.useEffect(() => {
@@ -87,7 +79,6 @@ export function ExampleOptimizedSearch() {
     search,
     data: searchResults,
     isLoading: searchLoading,
-    searchParams
   } = useOptimizedSearch()
   
   // Get search suggestions with caching
@@ -139,10 +130,10 @@ export function ExampleOptimizedSearch() {
                 {suggestions.suggestions.map((suggestion, index) => (
                   <button
                     key={index}
-                    onClick={() => handleSuggestionSelect(suggestion.value)}
+                    onClick={() => handleSuggestionSelect(suggestion.text)}
                     className="w-full px-4 py-2 text-left hover:bg-dark-600 text-dark-200"
                   >
-                    <span className="font-medium">{suggestion.value}</span>
+                    <span className="font-medium">{suggestion.text}</span>
                     <span className="text-dark-400 ml-2">({suggestion.type})</span>
                   </button>
                 ))}
@@ -193,12 +184,10 @@ export function ExampleBackgroundSync() {
     const cleanup = scheduleBackgroundSync(queryClient, [
       {
         queryKey: ['dashboard', 'stats'],
-        queryFn: () => import('@/services/dashboard').then(m => m.dashboardService.getStats()),
         interval: 60000 // Every minute
       },
       {
         queryKey: ['dashboard', 'system-status'],
-        queryFn: () => import('@/services/dashboard').then(m => m.dashboardService.getSystemStatus()),
         interval: 30000 // Every 30 seconds
       }
     ])
