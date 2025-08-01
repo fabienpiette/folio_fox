@@ -1,6 +1,6 @@
 // Configuration-related TypeScript types
 
-export type IndexerType = 'prowlarr' | 'jackett' | 'custom'
+export type IndexerType = 'torznab' | 'newznab' | 'rss' | 'html' | 'api'
 export type IndexerStatus = 'healthy' | 'unhealthy' | 'degraded' | 'maintenance'
 
 export interface Indexer {
@@ -151,6 +151,7 @@ export interface UserPreferences {
   time_format: '12h' | '24h'
   default_search_limit: number
   auto_download: boolean
+  notifications_enabled: boolean
   download_notifications: boolean
   email_notifications: boolean
   webhook_url?: string
@@ -167,6 +168,7 @@ export interface DownloadFolder {
   is_default: boolean
   format_filters?: string[]
   auto_organize: boolean
+  folder_pattern: string
   created_at: string
   updated_at: string
 }
@@ -176,6 +178,7 @@ export interface QualityProfile {
   user_id: number
   name: string
   preferred_formats: string[]
+  min_quality_score: number
   min_file_size_mb?: number
   max_file_size_mb?: number
   language_preferences: string[]

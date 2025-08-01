@@ -113,19 +113,19 @@ export function IndexerForm({ indexer, isOpen, onClose, onSuccess }: IndexerForm
       }
     }
     
-    if (formData.priority < 1 || formData.priority > 100) {
+    if (formData.priority !== undefined && (formData.priority < 1 || formData.priority > 100)) {
       newErrors.priority = 'Priority must be between 1 and 100'
     }
     
-    if (formData.rate_limit_requests < 1) {
+    if (formData.rate_limit_requests !== undefined && formData.rate_limit_requests < 1) {
       newErrors.rate_limit_requests = 'Rate limit requests must be at least 1'
     }
     
-    if (formData.rate_limit_window < 1) {
+    if (formData.rate_limit_window !== undefined && formData.rate_limit_window < 1) {
       newErrors.rate_limit_window = 'Rate limit window must be at least 1 second'
     }
     
-    if (formData.timeout_seconds < 5 || formData.timeout_seconds > 300) {
+    if (formData.timeout_seconds !== undefined && (formData.timeout_seconds < 5 || formData.timeout_seconds > 300)) {
       newErrors.timeout_seconds = 'Timeout must be between 5 and 300 seconds'
     }
     

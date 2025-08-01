@@ -52,7 +52,7 @@ export function SystemSettings() {
   const maintenanceMutation = useRunMaintenance()
 
   // Settings form state
-  const [settingsForm, setSettingsForm] = useState<Record<string, string>>({})
+  const [settingsForm, setSettingsForm] = useState<Record<string, any>>({})
 
   // Update form when settings load
   useEffect(() => {

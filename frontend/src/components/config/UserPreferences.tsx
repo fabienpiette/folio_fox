@@ -105,6 +105,7 @@ export function UserPreferences() {
     min_quality_score: 0,
     max_file_size_mb: '',
     language_preferences: ['en'],
+    quality_order: ['epub', 'pdf'],
     is_default: false
   })
 
@@ -152,7 +153,8 @@ export function UserPreferences() {
     e.preventDefault()
     const profileData = {
       ...profileForm,
-      max_file_size_mb: profileForm.max_file_size_mb ? parseInt(profileForm.max_file_size_mb) : undefined
+      max_file_size_mb: profileForm.max_file_size_mb ? parseInt(profileForm.max_file_size_mb) : undefined,
+      quality_order: profileForm.quality_order || profileForm.preferred_formats
     }
     
     if (editingProfile) {
@@ -192,6 +194,7 @@ export function UserPreferences() {
       min_quality_score: 0,
       max_file_size_mb: '',
       language_preferences: ['en'],
+      quality_order: ['epub', 'pdf'],
       is_default: false
     })
   }
@@ -215,6 +218,7 @@ export function UserPreferences() {
       min_quality_score: profile.min_quality_score,
       max_file_size_mb: profile.max_file_size_mb?.toString() || '',
       language_preferences: Array.from(profile.language_preferences),
+      quality_order: Array.from(profile.quality_order),
       is_default: profile.is_default
     })
   }
