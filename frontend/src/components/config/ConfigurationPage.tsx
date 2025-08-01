@@ -8,6 +8,10 @@ import {
 } from '@heroicons/react/24/outline'
 import { cn } from '@/utils/cn'
 import { IndexerManagement } from './IndexerManagement'
+import { IndexerForm } from './IndexerForm'
+import { UserPreferences } from './UserPreferences'
+import { SystemSettings } from './SystemSettings'
+import { IndexerResponse } from '@/types/config'
 
 const configTabs = [
   { 
@@ -42,6 +46,23 @@ const configTabs = [
 
 export function ConfigurationPage() {
   const [userRole] = useState<'admin' | 'user'>('admin') // TODO: Get from auth context
+  const [isIndexerFormOpen, setIsIndexerFormOpen] = useState(false)
+  const [editingIndexer, setEditingIndexer] = useState<IndexerResponse | undefined>()
+
+  const handleCreateIndexer = () => {
+    setEditingIndexer(undefined)
+    setIsIndexerFormOpen(true)
+  }
+
+  const handleEditIndexer = (indexer: IndexerResponse) => {
+    setEditingIndexer(indexer)
+    setIsIndexerFormOpen(true)
+  }
+
+  const handleCloseIndexerForm = () => {
+    setIsIndexerFormOpen(false)
+    setEditingIndexer(undefined)
+  }
 
   return (
     <div className="space-y-8">
@@ -95,51 +116,38 @@ export function ConfigurationPage() {
               element={
                 <IndexerManagement 
                   userRole={userRole}
-                  onCreateIndexer={() => {
-                    // TODO: Open create indexer modal
-                    console.log('Create indexer')
-                  }}
-                  onEditIndexer={(indexer) => {
-                    // TODO: Open edit indexer modal
-                    console.log('Edit indexer', indexer)
-                  }}
+                  onCreateIndexer={handleCreateIndexer}
+                  onEditIndexer={handleEditIndexer}
                 />
               } 
             />
             <Route 
               path="/preferences" 
-              element={
-                <div className="card p-6">
-                  <h2 className="text-xl font-semibold text-dark-50 mb-4">User Preferences</h2>
-                  <p className="text-dark-400">User preferences panel will be implemented here</p>
-                </div>
-              } 
+              element={<UserPreferences />} 
             />
             {userRole === 'admin' && (
               <>
                 <Route 
                   path="/system" 
-                  element={
-                    <div className="card p-6">
-                      <h2 className="text-xl font-semibold text-dark-50 mb-4">System Settings</h2>
-                      <p className="text-dark-400">System settings panel will be implemented here</p>
-                    </div>
-                  } 
+                  element={<SystemSettings />} 
                 />
                 <Route 
                   path="/maintenance" 
-                  element={
-                    <div className="card p-6">
-                      <h2 className="text-xl font-semibold text-dark-50 mb-4">System Maintenance</h2>
-                      <p className="text-dark-400">Maintenance tools will be implemented here</p>
-                    </div>
-                  } 
+                  element={<SystemSettings />} 
                 />
               </>
             )}
           </Routes>
         </div>
       </div>
+
+      {/* Indexer Form Modal */}
+      <IndexerForm
+        indexer={editingIndexer}
+        isOpen={isIndexerFormOpen}
+        onClose={handleCloseIndexerForm}
+        onSuccess={handleCloseIndexerForm}
+      />
     </div>
   )
 }
