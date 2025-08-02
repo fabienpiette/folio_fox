@@ -180,14 +180,21 @@ func (m *Manager) searchIndexer(
 	var result *models.SearchResponse
 	var err error
 
+	// Thread-safe access to clients
+	m.mu.RLock()
+	prowlarrClient := m.prowlarrClient
+	jackettClient := m.jackettClient
+	directIndexer, hasDirectIndexer := m.directIndexers[strings.ToLower(indexer.Name)]
+	m.mu.RUnlock()
+
 	switch {
-	case m.prowlarrClient != nil && strings.Contains(strings.ToLower(indexer.Name), "prowlarr"):
-		result, err = m.prowlarrClient.Search(ctx, request)
-	case m.jackettClient != nil && strings.Contains(strings.ToLower(indexer.Name), "jackett"):
-		result, err = m.jackettClient.Search(ctx, request)
+	case prowlarrClient != nil && strings.Contains(strings.ToLower(indexer.Name), "prowlarr"):
+		result, err = prowlarrClient.Search(ctx, request)
+	case jackettClient != nil && strings.Contains(strings.ToLower(indexer.Name), "jackett"):
+		result, err = jackettClient.Search(ctx, request)
 	default:
 		// Try direct indexer
-		if directIndexer, exists := m.directIndexers[strings.ToLower(indexer.Name)]; exists {
+		if hasDirectIndexer {
 			result, err = directIndexer.Search(ctx, request)
 		} else {
 			err = fmt.Errorf("no client available for indexer: %s", indexer.Name)
@@ -200,6 +207,28 @@ func (m *Manager) searchIndexer(
 		// Record failed health check
 		errMsg := err.Error()
 		m.healthMonitor.RecordHealthCheck(ctx, indexer.ID, models.IndexerStatusDown, nil, &errMsg)
+		
+		// Create a failed indexer result to include in the response
+		// This ensures that failed indexers are reported in IndexersSearched
+		failedResult := &models.SearchResponse{
+			Query:        request.Query,
+			Results:      []models.SearchResult{}, // No results from failed indexer
+			TotalResults: 0,
+			IndexersSearched: []models.IndexerSearchResult{
+				{
+					IndexerID:      indexer.ID,
+					IndexerName:    indexer.Name,
+					ResultCount:    0,
+					ResponseTimeMS: 0,
+					Error:          &errMsg, // Include the error message
+				},
+			},
+			SearchDurationMS: 0,
+			Cached:          false,
+		}
+		
+		// Send the failed result to ensure it's included in the final response
+		resultsChan <- failedResult
 		return
 	}
 
@@ -397,11 +426,18 @@ func (m *Manager) TestIndexer(ctx context.Context, indexerID int64) (*models.Ind
 	start := time.Now()
 	var result *models.IndexerTestResult
 
+	// Thread-safe access to clients
+	m.mu.RLock()
+	prowlarrClient := m.prowlarrClient
+	jackettClient := m.jackettClient
+	directIndexer, hasDirectIndexer := m.directIndexers[strings.ToLower(indexer.Name)]
+	m.mu.RUnlock()
+
 	// Test based on indexer type
 	switch {
-	case m.prowlarrClient != nil && strings.Contains(strings.ToLower(indexer.Name), "prowlarr"):
+	case prowlarrClient != nil && strings.Contains(strings.ToLower(indexer.Name), "prowlarr"):
 		// Test Prowlarr indexer
-		testResult, err := m.prowlarrClient.TestConnection(ctx)
+		testResult, err := prowlarrClient.TestConnection(ctx)
 		if err != nil {
 			errMsg := err.Error()
 			result = &models.IndexerTestResult{
@@ -414,9 +450,9 @@ func (m *Manager) TestIndexer(ctx context.Context, indexerID int64) (*models.Ind
 			result = testResult
 			result.IndexerID = indexerID
 		}
-	case m.jackettClient != nil && strings.Contains(strings.ToLower(indexer.Name), "jackett"):
+	case jackettClient != nil && strings.Contains(strings.ToLower(indexer.Name), "jackett"):
 		// Test Jackett indexer
-		testResult, err := m.jackettClient.TestConnection(ctx)
+		testResult, err := jackettClient.TestConnection(ctx)
 		if err != nil {
 			errMsg := err.Error()
 			result = &models.IndexerTestResult{
@@ -431,7 +467,7 @@ func (m *Manager) TestIndexer(ctx context.Context, indexerID int64) (*models.Ind
 		}
 	default:
 		// Test direct indexer
-		if directIndexer, exists := m.directIndexers[strings.ToLower(indexer.Name)]; exists {
+		if hasDirectIndexer {
 			testResult, err := directIndexer.TestConnection(ctx)
 			if err != nil {
 				errMsg := err.Error()
